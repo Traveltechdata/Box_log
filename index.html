@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+<title>Box Log — WOD adattivo</title>
+<meta name="description" content="Generatore di allenamenti CrossFit adattivo: readiness, tempo disponibile e storico, tutto sul telefono." />
+<meta name="theme-color" content="#1C211D" />
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Box Log" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div id="app">
+
+  <header class="app-header">
+    <div class="brand">
+      <span class="dot-chain"><span></span><span></span><span></span></span>
+      Box Log
+    </div>
+    <button class="btn-ghost" id="btn-help" aria-label="Info">?</button>
+  </header>
+
+  <!-- ================= OGGI ================= -->
+  <main class="view active" id="view-today">
+
+    <section class="card" id="readiness-card" style="display:none;">
+      <div class="readiness-wrap">
+        <svg id="readiness-dial" width="180" height="110" viewBox="0 0 180 110"></svg>
+        <div class="readiness-score" id="readiness-score-num">–</div>
+        <div class="readiness-label" id="readiness-label-txt">–</div>
+        <div class="readiness-sub" id="readiness-sub-txt"></div>
+      </div>
+    </section>
+
+    <section class="card" id="checkin-card">
+      <h2>Check-in di oggi</h2>
+
+      <span class="field-label">Obiettivo della sessione</span>
+      <div class="chip-group" id="goal-chips"></div>
+
+      <span class="field-label">Tempo disponibile</span>
+      <div class="chip-group" id="time-chips"></div>
+
+      <div class="slider-row">
+        <div class="slider-top"><span>Energia</span><span class="val" id="val-energy">3</span></div>
+        <input type="range" min="1" max="5" value="3" id="in-energy" />
+      </div>
+      <div class="slider-row">
+        <div class="slider-top"><span>Qualità del sonno</span><span class="val" id="val-sleep">3</span></div>
+        <input type="range" min="1" max="5" value="3" id="in-sleep" />
+      </div>
+      <div class="slider-row">
+        <div class="slider-top"><span>Stress percepito</span><span class="val" id="val-stress">3</span></div>
+        <input type="range" min="1" max="5" value="3" id="in-stress" />
+      </div>
+      <div class="slider-row">
+        <div class="slider-top"><span>Dolori / rigidità</span><span class="val" id="val-soreness">2</span></div>
+        <input type="range" min="1" max="5" value="2" id="in-soreness" />
+      </div>
+
+      <button class="btn btn-primary" id="btn-generate">Genera WOD</button>
+    </section>
+
+    <section class="card" id="wod-card" style="display:none;">
+      <h3 id="wod-format-label">Sessione</h3>
+      <div class="wod-title" id="wod-title">–</div>
+      <div class="wod-stimulus" id="wod-stimulus"></div>
+      <hr class="chalk-rule" />
+
+      <div id="wod-blocks"></div>
+
+      <hr class="chalk-rule" />
+      <h3>Perché questo WOD</h3>
+      <ul class="wod-reasons" id="wod-reasons"></ul>
+
+      <div class="btn-row">
+        <button class="btn btn-secondary" id="btn-regenerate">Rigenera</button>
+        <button class="btn btn-primary" id="btn-complete">Segna svolto</button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ================= STORICO ================= -->
+  <main class="view" id="view-history">
+    <section class="card">
+      <h2>Ultime sessioni</h2>
+      <div id="history-list"></div>
+    </section>
+    <section class="card">
+      <h3>Dati</h3>
+      <p class="small muted">I dati restano solo su questo dispositivo/browser. Esportali per fare un backup o per spostarli su un altro dispositivo.</p>
+      <div class="btn-row">
+        <button class="btn btn-secondary" id="btn-export">Esporta JSON</button>
+        <button class="btn btn-secondary" id="btn-import">Importa JSON</button>
+      </div>
+      <input type="file" id="import-file" accept="application/json" style="display:none;" />
+    </section>
+  </main>
+
+  <!-- ================= PROFILO ================= -->
+  <main class="view" id="view-profile">
+    <section class="card">
+      <h2>Livello</h2>
+      <div class="chip-group" id="level-chips"></div>
+    </section>
+
+    <section class="card">
+      <h2>Attrezzatura disponibile</h2>
+      <div class="check-grid" id="equipment-grid"></div>
+    </section>
+
+    <section class="card">
+      <h2>Movimenti da evitare</h2>
+      <p class="small muted">Per infortuni o limitazioni. Il generatore li sostituirà automaticamente.</p>
+      <div class="check-grid" id="limitations-grid"></div>
+    </section>
+
+    <section class="card">
+      <h2>Note</h2>
+      <textarea id="in-notes" placeholder="Es. fastidio alla spalla destra in overhead, evitare impatti sul ginocchio sinistro…"></textarea>
+    </section>
+
+    <button class="btn btn-primary" id="btn-save-profile">Salva profilo</button>
+    <button class="btn btn-ghost" id="btn-reset" style="margin-top:14px;">Azzera tutti i dati dell'app</button>
+  </main>
+
+  <nav class="tab-bar">
+    <button class="tab-btn active" data-view="view-today">
+      <span class="tab-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></span>
+      Oggi
+    </button>
+    <button class="tab-btn" data-view="view-history">
+      <span class="tab-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-6 4 3 5-8"/></svg></span>
+      Storico
+    </button>
+    <button class="tab-btn" data-view="view-profile">
+      <span class="tab-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 5-6 8-6s6.5 2 8 6"/></svg></span>
+      Profilo
+    </button>
+  </nav>
+
+  <div id="toast"></div>
+</div>
+
+<script type="module" src="js/app.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+  }
+</script>
+</body>
+</html>
