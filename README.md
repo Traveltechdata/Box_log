@@ -4,14 +4,20 @@ Web app personale (PWA) per generare allenamenti CrossFit adattati a obiettivo, 
 
 ## Come funziona
 
-- **Profilo**: livello, attrezzatura disponibile, movimenti da evitare, promemoria di allenamento.
+- **Profilo**: livello, attrezzatura disponibile, movimenti da evitare, **massimali (1RM)** sui sollevamenti principali, promemoria di allenamento.
 - **Check-in** (ogni volta che ti alleni): obiettivo, tempo disponibile, energia, sonno, stress, dolori → calcola una **readiness** 0–100.
-- **Generatore**: sceglie un template di sessione adatto a obiettivo/tempo, riempie gli "slot" con movimenti compatibili con la tua attrezzatura e le tue limitazioni, scala volume/intensità in base alla readiness, e valida che stia nel tempo disponibile. Se hai un obiettivo trimestrale attivo su un sollevamento, il generatore lo privilegia nelle sessioni di forza.
+- **Generatore**: sceglie un formato WOD vero (For Time, AMRAP a round, AMRAP reps, EMOM, Tabata, Death By, Forza, Skill, Steady state) in base a obiettivo/tempo/readiness, con:
+  - **warm-up mirato** ai pattern di movimento della sessione (non generico);
+  - **Forza** con schema serie×reps×%1RM calcolato sui tuoi massimali (es. "5×5 @ 75% (90kg)");
+  - **Skill** con tentativi/serie tecniche esplicite, mai un movimento base;
+  - **metcon** con movimenti nominati, reps/carico Rx espliciti e struttura corretta per il formato (scaletta, round fissi, round+reps, reps/minuto, ecc.);
+  - **variet\u00e0 reale**: penalizza la ripetizione dello stesso WOD nelle sessioni recenti e sceglie casualmente tra le opzioni migliori, non sempre la stessa.
+  Se hai un obiettivo trimestrale attivo su un sollevamento, il generatore lo privilegia nelle sessioni di forza.
 - **Storico**: ogni WOD generato viene salvato; puoi segnarlo come svolto con l'RPE percepito, che alimenta il carico di allenamento (`durata × RPE`), visibile anche in un grafico di trend. Include una vista **calendario** con la possibilità di pianificare allenamenti futuri.
-- **Obiettivi**: traguardi a medio termine (es. "Back squat 110kg entro 3 mesi") con barra di avanzamento e stato (in linea / in ritardo / raggiunto / scaduto).
+- **Obiettivi**: traguardi a medio termine (es. "Back squat 110kg entro 3 mesi") con barra di avanzamento e stato (in linea / in ritardo / raggiunto / scaduto). Aggiornare il valore di un obiettivo su un sollevamento sincronizza automaticamente il tuo 1RM in Profilo.
 - **Motivazione**: streak di allenamenti, giorni dall'ultima sessione, messaggi incoraggianti, e promemoria configurabili (giorni + orario).
 
-Il motore è tutto deterministico (regole + punteggio), niente chiamate esterne: funziona anche offline una volta caricata la pagina la prima volta.
+Il motore è tutto deterministico (regole + punteggio + una quota di variet\u00e0 controllata), niente chiamate esterne: funziona anche offline una volta caricata la pagina la prima volta.
 
 ### Nota sui promemoria
 
@@ -46,17 +52,18 @@ I dati restano solo su quel dispositivo/browser: se cancelli i dati di Safari o 
 
 ## Estendere il motore
 
-- `js/data/movements.js` — database dei movimenti (pattern, skill, fatica, attrezzatura, sostituzioni).
-- `js/data/templates.js` — "forme" di sessione (AMRAP, For Time, EMOM, Tabata, Strength, Recovery…).
-- `js/generator/generateWod.js` — pipeline: obiettivo → template → movimenti → scalatura → validazione → punteggio.
+- `js/data/movements.js` — database dei movimenti (pattern, skill, fatica, attrezzatura, carico Rx, sostituzioni).
+- `js/data/templates.js` — formati WOD (FOR_TIME, AMRAP_ROUNDS, AMRAP_REPS, EMOM, TABATA, DEATH_BY, STRENGTH, SKILL, STEADY, RECOVERY).
+- `js/data/warmups.js` — drill di riscaldamento specifici per pattern di movimento.
+- `js/generator/generateWod.js` — pipeline: obiettivo → template → costruttore di formato → movimenti/carichi → validazione → punteggio.
 - `js/generator/readiness.js` — calcolo readiness e training load.
 - `js/generator/scaling.js` — selezione movimenti, sostituzioni, scalatura per readiness/tempo.
-- `js/generator/validation.js` — regole bloccanti e scoring dei candidati.
+- `js/generator/validation.js` — regole bloccanti, scoring dei candidati e penalità anti-ripetizione.
 - `js/goals.js` — logica obiettivi trimestrali (progresso, stato, scadenza).
 - `js/motivation.js` — streak, messaggi motivazionali, logica promemoria.
 - `js/ui/calendar.js` — griglia calendario mensile.
 - `js/ui/chart.js` — grafici SVG (carico di allenamento, volume settimanale).
-- `js/storage.js` — persistenza `localStorage` (profilo, sessioni, obiettivi, promemoria).
+- `js/storage.js` — persistenza `localStorage` (profilo con 1RM, sessioni, obiettivi, promemoria).
 
 Aggiungere un movimento o un template è questione di aggiungere una entry nei rispettivi file dati: il generatore lo userà automaticamente se rientra nei pattern/goal giusti.
 

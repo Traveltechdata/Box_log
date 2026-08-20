@@ -12,6 +12,7 @@ const APP_SHELL = [
   './js/ui/chart.js',
   './js/data/movements.js',
   './js/data/templates.js',
+  './js/data/warmups.js',
   './js/generator/generateWod.js',
   './js/generator/readiness.js',
   './js/generator/scaling.js',

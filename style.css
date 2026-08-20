@@ -333,6 +333,49 @@ textarea { min-height: 60px; resize: vertical; }
 .goal-actions { display: flex; gap: 8px; margin-top: 10px; }
 .goal-actions .btn { padding: 8px 10px; font-size: 11.5px; }
 
+/* ---------- 1RM grid ---------- */
+.onerm-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.onerm-row:last-child { border-bottom: none; }
+.onerm-row label { font-size: 13.5px; flex: 1; }
+.onerm-row .onerm-input-wrap { display: flex; align-items: center; gap: 6px; }
+.onerm-row input[type="number"] {
+  width: 72px;
+  margin-bottom: 0;
+  text-align: right;
+  font-family: var(--font-mono);
+}
+.onerm-row .unit { font-size: 12px; color: var(--chalk-dim); }
+
+/* ---------- strength / skill primary block ---------- */
+.primary-block {
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  margin: 4px 0 14px;
+  background: var(--board-raised, rgba(244,241,232,0.03));
+}
+.primary-block .primary-kind {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 12px;
+  color: var(--marker-red);
+  margin-bottom: 4px;
+}
+.primary-block.skill .primary-kind { color: var(--marker-yellow); }
+.primary-block .primary-movement { font-size: 17px; font-weight: 600; margin-bottom: 6px; }
+.primary-block .primary-prescription { font-family: var(--font-mono); font-size: 14px; color: var(--chalk); line-height: 1.5; }
+
+.wod-structure { font-family: var(--font-mono); font-size: 13px; color: var(--marker-yellow); margin-bottom: 4px; }
+.wod-score-type { font-size: 11.5px; color: var(--chalk-dim); margin-bottom: 10px; font-style: italic; }
+
 .select-input {
   width: 100%;
   background: var(--board);
