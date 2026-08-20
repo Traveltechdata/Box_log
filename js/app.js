@@ -2,7 +2,7 @@ import { generateWod } from './generator/generateWod.js';
 import { computeReadiness, readinessBand, trainingLoad } from './generator/readiness.js';
 import {
   getProfile, saveProfile, getSessions, saveSession, updateLastSession, updateSessionById,
-  addPlannedSession, deleteSessionById, recentPatterns, completedSessionsSorted, sessionsInMonth,
+  addPlannedSession, deleteSessionById, recentPatterns, recentTemplateIds, completedSessionsSorted, sessionsInMonth,
   getGoals, saveGoal, updateGoal, deleteGoal,
   getReminderSettings, saveReminderSettings,
   exportData, importData, clearAll,
@@ -87,6 +87,21 @@ const GOAL_MOVEMENTS = [
   { id: 'double_under', label: 'Double-under (max consecutivi)' },
   { id: null, label: 'Altro (benchmark, tempo su distanza\u2026)' },
 ];
+const ONE_RM_MOVEMENTS = [
+  { id: 'back_squat', label: 'Back squat' },
+  { id: 'front_squat', label: 'Front squat' },
+  { id: 'overhead_squat', label: 'Overhead squat' },
+  { id: 'deadlift', label: 'Deadlift' },
+  { id: 'strict_press', label: 'Strict press' },
+  { id: 'push_press', label: 'Push press' },
+  { id: 'push_jerk', label: 'Push jerk' },
+  { id: 'clean', label: 'Clean' },
+  { id: 'power_clean', label: 'Power clean' },
+  { id: 'snatch', label: 'Snatch' },
+  { id: 'power_snatch', label: 'Power snatch' },
+  { id: 'clean_and_jerk', label: 'Clean & jerk' },
+];
+
 const GOAL_UNITS = [
   { id: 'kg', label: 'kg' },
   { id: 'lb', label: 'lb' },
@@ -262,11 +277,19 @@ function buildGenerationInput() {
     equipment: profile.equipment,
     limitations: profile.limitations,
     recentPatterns: recentPatterns(2),
+    recentTemplateIds: recentTemplateIds(3),
     readinessScore: score,
     band,
     priorityMovementIds: activePriorityMovementIds(),
+    oneRMs: profile.oneRMs || {},
   };
 }
+
+const FORMAT_LABELS = {
+  FOR_TIME: 'For Time', AMRAP_ROUNDS: 'AMRAP', AMRAP_REPS: 'AMRAP reps',
+  EMOM: 'EMOM', TABATA: 'Tabata', DEATH_BY: 'Death By', STRENGTH: 'Forza',
+  SKILL: 'Skill', STEADY: 'Steady state', RECOVERY: 'Recovery', TECHNICAL: 'Tecnica leggera',
+};
 
 function renderWodBlock(key, label, minutes, content) {
   return `
@@ -281,29 +304,54 @@ function renderWodBlock(key, label, minutes, content) {
   `;
 }
 
+function renderWarmupContent(warmup) {
+  const items = [`<li><span>${warmup.raise.name}</span><span class="reps">${warmup.raise.minutes} min</span></li>`]
+    .concat(warmup.drills.map(d => `<li><span>${d.name}</span><span class="reps">${d.prescription}</span></li>`));
+  return `<ul class="wod-move-list">${items.join('')}</ul>`;
+}
+
+function renderPrimaryBlock(primary) {
+  return `
+    <div class="primary-block ${primary.kind}">
+      <div class="primary-kind">${primary.label}</div>
+      <div class="primary-movement">${primary.movement.name}</div>
+      <div class="primary-prescription">${primary.prescriptionText}</div>
+    </div>
+  `;
+}
+
+function renderMainMetconContent(main) {
+  const moveItems = main.movements.map(m =>
+    `<li><span>${m.name}${m.loadText ? ` <span class="muted small">(${m.loadText})</span>` : ''}</span><span class="reps">${m.repsText}</span></li>`
+  ).join('');
+  const rpeLine = main.targetRpe
+    ? `<span>Target RPE ${main.targetRpe[0]}\u2013${main.targetRpe[1]}</span><span>Cap RPE ${main.capRpe}</span>`
+    : '';
+  return `
+    <div class="wod-structure">${main.structureText}</div>
+    ${main.scoreType ? `<div class="wod-score-type">Punteggio: ${main.scoreType}</div>` : ''}
+    <ul class="wod-move-list">${moveItems}</ul>
+    <div class="wod-meta">${rpeLine}</div>
+  `;
+}
+
 function renderWod(wod) {
   state.currentWod = wod;
   $('#wod-card').style.display = 'block';
   $('#wod-format-label').textContent = wod.templateLabel;
-  $('#wod-title').textContent = wod.format + (wod.main.rounds > 1 && wod.format !== 'AMRAP' ? ` \u00d7 ${wod.main.rounds}` : '');
+  $('#wod-title').textContent = FORMAT_LABELS[wod.format] || wod.format;
   $('#wod-stimulus').textContent = wod.stimulus;
 
   let html = '';
-  html += renderWodBlock('warmup', 'Warm-up', wod.warmup.minutes,
-    `<ul class="wod-move-list">${wod.warmup.items.map(i => `<li><span>${i}</span></li>`).join('')}</ul>`);
+  html += renderWodBlock('warmup', 'Warm-up', wod.warmup.minutes, renderWarmupContent(wod.warmup));
 
-  if (wod.skill) {
-    html += renderWodBlock('skill', 'Skill / Forza', wod.skill.minutes, `<p>${wod.skill.text}</p>`);
+  if (wod.primary) {
+    html += renderPrimaryBlock(wod.primary);
   }
 
-  const moveItems = wod.main.movements.map(m =>
-    `<li><span>${m.name}</span><span class="reps">${m.reps} ${m.unit}</span></li>`).join('');
-  html += renderWodBlock('main', 'WOD', wod.main.estimatedMinutes,
-    `<ul class="wod-move-list">${moveItems}</ul>
-     <div class="wod-meta">
-       <span>Target RPE ${wod.main.targetRpe[0]}\u2013${wod.main.targetRpe[1]}</span>
-       <span>Cap RPE ${wod.main.capRpe}</span>
-     </div>`);
+  if (wod.main) {
+    html += renderWodBlock('main', 'WOD', wod.main.estimatedMinutes, renderMainMetconContent(wod.main));
+  }
 
   html += renderWodBlock('cooldown', 'Cooldown', wod.cooldown.minutes, `<p>${wod.cooldown.text}</p>`);
 
@@ -322,6 +370,7 @@ $('#btn-generate').addEventListener('click', () => {
     readinessScore: input.readinessScore,
     readinessBand: input.band.key,
     wod,
+    templateId: wod.templateId,
     patternsHit: wod.patternsHit,
     completed: null,
     actualRpe: null,
@@ -340,6 +389,7 @@ $('#btn-regenerate').addEventListener('click', () => {
     readinessScore: input.readinessScore,
     readinessBand: input.band.key,
     wod,
+    templateId: wod.templateId,
     patternsHit: wod.patternsHit,
   });
   toast('Nuova versione generata');
@@ -349,7 +399,7 @@ $('#btn-complete').addEventListener('click', () => {
   const rpe = prompt('RPE percepito della sessione (1\u201310)?', '7');
   if (rpe === null) return;
   const parsedRpe = Math.max(1, Math.min(10, Number(rpe) || 7));
-  const minutes = state.currentWod?.main?.estimatedMinutes || state.selectedMinutes;
+  const minutes = state.currentWod?.main?.estimatedMinutes || state.currentWod?.primary?.minutes || state.selectedMinutes;
   updateLastSession({ status: 'done', completed: true, actualRpe: parsedRpe, load: trainingLoad(minutes, parsedRpe) });
   toast('Sessione registrata \u2014 ben fatto');
 });
@@ -648,8 +698,18 @@ function renderGoals() {
       const updated = { ...goal, ...patch };
       if (isAchieved(updated)) patch.achieved = true;
       updateGoal(goal.id, patch);
+
+      // Keep the 1RM in Profilo in sync when this goal tracks a barbell lift.
+      if (goal.movementId && goal.unit === 'kg' && ONE_RM_MOVEMENTS.some(m => m.id === goal.movementId)) {
+        const profile = state.profile || defaultProfile();
+        profile.oneRMs = profile.oneRMs || {};
+        profile.oneRMs[goal.movementId] = num;
+        saveProfile(profile);
+        state.profile = profile;
+      }
+
       renderGoals();
-      toast(patch.achieved ? 'Obiettivo raggiunto! Complimenti' : 'Valore aggiornato');
+      toast(patch.achieved ? 'Obiettivo raggiunto! Complimenti' : 'Valore aggiornato \u2014 sincronizzato anche il tuo 1RM');
     });
   });
   list.querySelectorAll('.btn-delete-goal').forEach(btn => {
@@ -719,7 +779,7 @@ function bindGoalForm() {
 
 // ---------------- profile ----------------
 function defaultProfile() {
-  return { level: 'intermediate', equipment: [], limitations: [], notes: '' };
+  return { level: 'intermediate', equipment: [], limitations: [], notes: '', oneRMs: {} };
 }
 
 function hydrateProfileForm() {
@@ -742,7 +802,30 @@ function hydrateProfileForm() {
     checked ? set.add(id) : set.delete(id);
     state.profile.limitations = Array.from(set);
   });
+  renderOneRmGrid(profile.oneRMs || {});
   $('#in-notes').value = profile.notes || '';
+}
+
+function renderOneRmGrid(oneRMs) {
+  const grid = $('#onerm-grid');
+  grid.innerHTML = ONE_RM_MOVEMENTS.map(m => `
+    <div class="onerm-row">
+      <label for="onerm-${m.id}">${m.label}</label>
+      <div class="onerm-input-wrap">
+        <input type="number" id="onerm-${m.id}" min="0" step="0.5" value="${oneRMs[m.id] ?? ''}" placeholder="\u2014" />
+        <span class="unit">kg</span>
+      </div>
+    </div>
+  `).join('');
+  ONE_RM_MOVEMENTS.forEach(m => {
+    $('#onerm-' + m.id).addEventListener('change', (e) => {
+      state.profile = state.profile || defaultProfile();
+      state.profile.oneRMs = state.profile.oneRMs || {};
+      const val = Number(e.target.value);
+      if (e.target.value === '' || Number.isNaN(val)) delete state.profile.oneRMs[m.id];
+      else state.profile.oneRMs[m.id] = val;
+    });
+  });
 }
 
 $('#btn-save-profile').addEventListener('click', () => {

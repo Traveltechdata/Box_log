@@ -29,6 +29,13 @@ export function score(candidate, context) {
   }, 0);
   s -= recentPatternHits * 6;
 
+  // Strongly discourage repeating the exact same template used very recently —
+  // "constantly varied" is a core CrossFit principle, not just a slogan.
+  const recentTemplateIds = context.recentTemplateIds || [];
+  const templateRecencyIndex = recentTemplateIds.indexOf(candidate.template?.id);
+  if (templateRecencyIndex === 0) s -= 50;
+  else if (templateRecencyIndex > 0) s -= 25;
+
   const gripLoad = candidate.mainMovements.reduce((acc, item) => acc + item.movement.grip, 0);
   if (gripLoad > 10) s -= (gripLoad - 10) * 2;
 

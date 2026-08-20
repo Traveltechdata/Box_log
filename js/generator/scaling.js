@@ -62,28 +62,29 @@ export function resolveSubstitution(movement, context) {
 export function readinessScaling(band) {
   switch (band.key) {
     case 'high':
-      return { volumeMult: 1.05, intensityNote: 'puoi lavorare vicino al massimale del giorno', capRPE: 9 };
+      return { volumeMult: 1.05, loadMult: 1.0, intensityNote: 'puoi lavorare vicino al massimale del giorno', capRPE: 9 };
     case 'normal':
-      return { volumeMult: 1.0, intensityNote: 'carico e ritmo abituali', capRPE: 8 };
+      return { volumeMult: 1.0, loadMult: 1.0, intensityNote: 'carico e ritmo abituali', capRPE: 8 };
     case 'moderate':
-      return { volumeMult: 0.85, intensityNote: 'riduci carico di ~15-20%, dai priorità alla tecnica', capRPE: 7 };
+      return { volumeMult: 0.85, loadMult: 0.85, intensityNote: 'riduci carico di ~15-20%, dai priorità alla tecnica', capRPE: 7 };
     case 'low':
     default:
-      return { volumeMult: 0.6, intensityNote: 'lavoro leggero, tecnica o Zona 2, niente test', capRPE: 5 };
+      return { volumeMult: 0.6, loadMult: 0.7, intensityNote: 'lavoro leggero, tecnica o Zona 2, niente test', capRPE: 5 };
   }
 }
 
-// Scale a template's duration to the minutes actually available, keeping
-// warm-up and (if time allows) a short skill/strength block before the main piece.
+// Allocates the session into warm-up / main-block / cooldown minutes.
+// There is no separate "skill" slot anymore: for STRENGTH/SKILL templates the
+// main block IS the strength/skill work; for everything else it's the metcon.
 export function allocateTime(availableMinutes) {
   if (availableMinutes <= 15) {
-    return { warmup: Math.max(4, Math.round(availableMinutes * 0.25)), skill: 0, main: Math.round(availableMinutes * 0.75) - 2, cooldown: 2 };
+    return { warmup: Math.max(4, Math.round(availableMinutes * 0.3)), main: 0, cooldown: 2 };
   }
   if (availableMinutes <= 30) {
-    return { warmup: 7, skill: Math.round(availableMinutes * 0.2), main: availableMinutes - 7 - Math.round(availableMinutes * 0.2) - 3, cooldown: 3 };
+    return { warmup: 7, main: 0, cooldown: 3 };
   }
   if (availableMinutes <= 45) {
-    return { warmup: 8, skill: 10, main: availableMinutes - 8 - 10 - 5, cooldown: 5 };
+    return { warmup: 8, main: 0, cooldown: 5 };
   }
-  return { warmup: 10, skill: 15, main: availableMinutes - 10 - 15 - 8, cooldown: 8 };
+  return { warmup: 10, main: 0, cooldown: 8 };
 }

@@ -65,6 +65,15 @@ export function recentPatterns(count = 2) {
   return sessions.flatMap(s => s.patternsHit || []);
 }
 
+// Template ids used in the last N sessions (any status) — steers the generator
+// away from repeating the exact same WOD shape back-to-back.
+export function recentTemplateIds(count = 3) {
+  return getSessions()
+    .slice(0, count)
+    .map(s => s.templateId)
+    .filter(Boolean);
+}
+
 export function sessionsInMonth(year, month) {
   // month: 0-11
   return getSessions().filter(s => {
