@@ -78,6 +78,19 @@ body {
 }
 .brand .dot-chain span:nth-child(2) { background: var(--marker-red); }
 .brand .dot-chain span:nth-child(3) { background: var(--marker-teal); }
+.version-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--chalk-dim);
+  background: var(--board-alt);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 8px;
+  margin-left: 4px;
+}
 
 /* ---------- views ---------- */
 .view { display: none; padding: 0 20px 24px; flex: 1; }
@@ -332,6 +345,32 @@ textarea { min-height: 60px; resize: vertical; }
 .goal-status-badge { font-size: 10.5px; padding: 2px 8px; border-radius: 999px; font-family: var(--font-mono); text-transform: uppercase; }
 .goal-actions { display: flex; gap: 8px; margin-top: 10px; }
 .goal-actions .btn { padding: 8px 10px; font-size: 11.5px; }
+
+/* ---------- profile summary ---------- */
+#profile-summary-card { border-color: var(--marker-teal); }
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13.5px;
+}
+.summary-row:last-child { border-bottom: none; }
+.summary-row .k { color: var(--chalk-dim); }
+.summary-row .v { font-weight: 600; text-align: right; max-width: 65%; }
+.summary-tags { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.summary-tag {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  color: var(--chalk-dim);
+}
+.summary-empty { color: var(--chalk-dim); font-style: italic; font-size: 13px; padding: 6px 0; }
+.summary-records { margin-top: 6px; }
+.summary-records .summary-row .v { color: var(--marker-yellow); font-family: var(--font-mono); }
 
 /* ---------- 1RM grid ---------- */
 .onerm-row {

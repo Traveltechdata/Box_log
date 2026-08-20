@@ -12,6 +12,8 @@ import { computeStreak, daysSinceLast, motivationalMessage, REMINDER_DAYS, notif
 import { monthLabel, buildMonthGrid, weekdayHeaderHtml, renderMonthGridHtml } from './ui/calendar.js';
 import { trainingLoadChartSvg } from './ui/chart.js';
 
+export const APP_VERSION = 'v3 \u2014 21 ago 2026';
+
 // ---------------- static option lists ----------------
 const GOALS = [
   { id: 'conditioning', label: 'Conditioning' },
@@ -87,6 +89,12 @@ const GOAL_MOVEMENTS = [
   { id: 'double_under', label: 'Double-under (max consecutivi)' },
   { id: null, label: 'Altro (benchmark, tempo su distanza\u2026)' },
 ];
+const GENDERS = [
+  { id: 'm', label: 'Uomo' },
+  { id: 'f', label: 'Donna' },
+  { id: 'other', label: 'Preferisco non dirlo' },
+];
+
 const ONE_RM_MOVEMENTS = [
   { id: 'back_squat', label: 'Back squat' },
   { id: 'front_squat', label: 'Front squat' },
@@ -282,6 +290,7 @@ function buildGenerationInput() {
     band,
     priorityMovementIds: activePriorityMovementIds(),
     oneRMs: profile.oneRMs || {},
+    gender: profile.gender || null,
   };
 }
 
@@ -779,11 +788,20 @@ function bindGoalForm() {
 
 // ---------------- profile ----------------
 function defaultProfile() {
-  return { level: 'intermediate', equipment: [], limitations: [], notes: '', oneRMs: {} };
+  return { firstName: '', lastName: '', gender: null, level: 'intermediate', equipment: [], limitations: [], notes: '', oneRMs: {} };
 }
 
 function hydrateProfileForm() {
   const profile = state.profile || defaultProfile();
+  $('#in-firstname').value = profile.firstName || '';
+  $('#in-lastname').value = profile.lastName || '';
+  const bindGender = () => renderChipGroup($('#gender-chips'), GENDERS, profile.gender, (id) => {
+    state.profile = state.profile || defaultProfile();
+    state.profile.gender = id;
+    bindGender();
+  });
+  bindGender();
+
   const bindLevel = () => renderChipGroup($('#level-chips'), LEVELS, profile.level, (id) => {
     state.profile = state.profile || defaultProfile();
     state.profile.level = id;
@@ -804,6 +822,42 @@ function hydrateProfileForm() {
   });
   renderOneRmGrid(profile.oneRMs || {});
   $('#in-notes').value = profile.notes || '';
+  renderProfileSummary(profile);
+}
+
+function renderProfileSummary(profile) {
+  const wrap = $('#profile-summary');
+  const hasAnything = profile.firstName || profile.lastName || profile.equipment.length > 0 || Object.keys(profile.oneRMs || {}).length > 0;
+
+  if (!hasAnything) {
+    wrap.innerHTML = `<div class="summary-empty">Ancora nessun dato salvato. Compila i campi qui sotto e tocca "Salva profilo".</div>`;
+    return;
+  }
+
+  const fullName = [profile.firstName, profile.lastName].filter(Boolean).join(' ') || '\u2014';
+  const genderLabel = GENDERS.find(g => g.id === profile.gender)?.label || '\u2014';
+  const levelLabel = LEVELS.find(l => l.id === profile.level)?.label || '\u2014';
+
+  const equipmentTags = profile.equipment.length > 0
+    ? `<div class="summary-tags">${profile.equipment.map(id => {
+        const eq = EQUIPMENT.find(e => e.id === id);
+        return `<span class="summary-tag">${eq ? eq.label : id}</span>`;
+      }).join('')}</div>`
+    : '<span class="v muted">nessuna</span>';
+
+  const oneRMs = profile.oneRMs || {};
+  const recordRows = ONE_RM_MOVEMENTS
+    .filter(m => oneRMs[m.id] != null)
+    .map(m => `<div class="summary-row"><span class="k">${m.label}</span><span class="v">${oneRMs[m.id]}kg</span></div>`)
+    .join('');
+
+  wrap.innerHTML = `
+    <div class="summary-row"><span class="k">Nome</span><span class="v">${fullName}</span></div>
+    <div class="summary-row"><span class="k">Genere</span><span class="v">${genderLabel}</span></div>
+    <div class="summary-row"><span class="k">Livello</span><span class="v">${levelLabel}</span></div>
+    <div class="summary-row"><span class="k">Attrezzatura (${profile.equipment.length})</span>${equipmentTags}</div>
+    ${recordRows ? `<hr class="chalk-rule" /><h3>I tuoi record (1RM)</h3><div class="summary-records">${recordRows}</div>` : '<hr class="chalk-rule" /><div class="summary-empty">Nessun massimale ancora salvato.</div>'}
+  `;
 }
 
 function renderOneRmGrid(oneRMs) {
@@ -830,9 +884,12 @@ function renderOneRmGrid(oneRMs) {
 
 $('#btn-save-profile').addEventListener('click', () => {
   const profile = state.profile || defaultProfile();
+  profile.firstName = $('#in-firstname').value.trim();
+  profile.lastName = $('#in-lastname').value.trim();
   profile.notes = $('#in-notes').value;
   saveProfile(profile);
   state.profile = profile;
+  renderProfileSummary(profile);
   toast('Profilo salvato');
 });
 
@@ -922,6 +979,7 @@ function bindTimeChips() {
 function init() {
   state.profile = getProfile() || defaultProfile();
 
+  $('#version-badge').textContent = APP_VERSION;
   bindGoalChips();
   bindTimeChips();
   hydrateProfileForm();

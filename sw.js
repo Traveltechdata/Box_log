@@ -1,4 +1,6 @@
-const CACHE_NAME = 'box-log-v1';
+// IMPORTANT: bump this on every release. It's the only thing that forces old
+// cached files (HTML/JS/CSS) out of the browser once a new version is deployed.
+const CACHE_NAME = 'box-log-v3-2026-08-21';
 const APP_SHELL = [
   './',
   './index.html',
@@ -32,13 +34,14 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    )
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
-// Cache-first for the app shell, network-first fallback for everything else
-// (e.g. the Google Fonts stylesheet, which needs to stay fresh when online).
+// NETWORK-FIRST for same-origin app files: always try to fetch the latest
+// version first. Cache is only used as an offline fallback, never preferred
+// over the network — otherwise updates deployed to GitHub Pages would never
+// reach a device that has already loaded the app once.
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
@@ -46,11 +49,13 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
   if (url.origin === location.origin) {
     event.respondWith(
-      caches.match(req).then((cached) => cached || fetch(req).then((res) => {
-        const resClone = res.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(req, resClone));
-        return res;
-      }).catch(() => cached))
+      fetch(req, { cache: 'no-store' })
+        .then((res) => {
+          const resClone = res.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(req, resClone));
+          return res;
+        })
+        .catch(() => caches.match(req))
     );
   } else {
     event.respondWith(

@@ -22,10 +22,12 @@ function secPerRep(movement) {
   return SEC_PER_REP[movement.patterns[0]] || 3;
 }
 
-function loadTextFor(movement, loadMult) {
+function loadTextFor(movement, loadMult, gender) {
   if (!movement.loadRx) return null;
-  const m = Math.round((movement.loadRx.m * loadMult) / 1 * 2) / 2; // nearest 0.5kg
-  const f = Math.round((movement.loadRx.f * loadMult) / 1 * 2) / 2;
+  const m = Math.round((movement.loadRx.m * loadMult) * 2) / 2; // nearest 0.5kg
+  const f = Math.round((movement.loadRx.f * loadMult) * 2) / 2;
+  if (gender === 'm') return `${m}kg`;
+  if (gender === 'f') return `${f}kg`;
   return `${m}/${f}kg`;
 }
 
@@ -36,14 +38,33 @@ function pickMetconMovement(slot, context, usedIds) {
 
 function pickPreferredMovement(template, context) {
   const ids = template.preferredMovementIds || [];
-  const candidates = ids
-    .map(getMovement)
-    .filter(Boolean)
-    .filter(m => m.equipment.every(e => context.equipment.includes(e)))
-    .filter(m => !context.limitations.includes(m.id));
-  if (candidates.length === 0) return null;
-  const goalMatch = candidates.find(m => context.priorityMovementIds.includes(m.id));
-  return goalMatch || candidates[0];
+  const isUsable = m => m && m.equipment.every(e => context.equipment.includes(e)) && !context.limitations.includes(m.id);
+
+  const direct = ids.map(getMovement).filter(Boolean).filter(isUsable);
+  if (direct.length > 0) {
+    const goalMatch = direct.find(m => context.priorityMovementIds.includes(m.id));
+    return { movement: goalMatch || direct[0], substituted: false };
+  }
+
+  // None of the ideal barbell/skill movements are usable (e.g. no barbell available).
+  // Walk each preferred movement's substitution chain rather than giving up —
+  // a real (if lighter) strength/skill stimulus beats collapsing to recovery.
+  for (const id of ids) {
+    const original = getMovement(id);
+    if (!original) continue;
+    let current = original;
+    let guard = 0;
+    while (guard++ < 6) {
+      if (isUsable(current)) {
+        return { movement: current, substituted: true, originalName: original.name };
+      }
+      const nextId = current.substitutions?.find(sid => !context.limitations.includes(sid));
+      if (!nextId) break;
+      current = getMovement(nextId);
+      if (!current) break;
+    }
+  }
+  return null;
 }
 
 // ---------------- warm-up ----------------
@@ -60,8 +81,9 @@ function buildWarmup(minutes, patterns, equipment) {
 
 // ---------------- STRENGTH ----------------
 function buildStrength(template, context, minutes) {
-  const movement = pickPreferredMovement(template, context);
-  if (!movement) return null;
+  const picked = pickPreferredMovement(template, context);
+  if (!picked) return null;
+  const { movement, substituted, originalName } = picked;
 
   const base = STRENGTH_SCHEMES[context.readinessBand.key] || STRENGTH_SCHEMES.normal;
   let { sets, reps, pct } = base;
@@ -71,11 +93,25 @@ function buildStrength(template, context, minutes) {
     pct = Math.max(0.5, pct - 0.05);
   }
 
-  const oneRM = context.oneRMs?.[movement.id];
+  let prescriptionText;
   let loadText;
-  if (oneRM) {
-    const loadKg = Math.round((oneRM * pct) / 2.5) * 2.5;
-    loadText = `${loadKg}kg`;
+
+  if (movement.isStrengthLift) {
+    const oneRM = context.oneRMs?.[movement.id];
+    if (oneRM) {
+      const loadKg = Math.round((oneRM * pct) / 2.5) * 2.5;
+      loadText = `${loadKg}kg`;
+    }
+    prescriptionText = loadText
+      ? `${sets} x ${reps} @ ${Math.round(pct * 100)}% (${loadText})`
+      : `${sets} x ${reps} @ ${Math.round(pct * 100)}% del tuo 1RM \u2014 inserisci il massimale in Profilo per vedere il carico in kg`;
+  } else {
+    // No barbell available for the ideal lift: real load, RPE-anchored instead of %1RM.
+    prescriptionText = `${sets} x ${reps}, carico che ti porti a RPE 7-8 \u2014 aumenta ad ogni serie se il movimento resta pulito`;
+  }
+
+  if (substituted) {
+    prescriptionText += ` (sostituito a ${originalName}: bilanciere/rack non disponibili in Profilo)`;
   }
 
   return {
@@ -86,17 +122,16 @@ function buildStrength(template, context, minutes) {
     sets, reps, pct: Math.round(pct * 100),
     loadText,
     minutes,
-    prescriptionText: loadText
-      ? `${sets} x ${reps} @ ${Math.round(pct * 100)}% (${loadText})`
-      : `${sets} x ${reps} @ ${Math.round(pct * 100)}% del tuo 1RM \u2014 inserisci il massimale in Profilo per vedere il carico in kg`,
+    prescriptionText,
     patternsHit: movement.patterns,
   };
 }
 
 // ---------------- SKILL ----------------
 function buildSkill(template, context, minutes) {
-  const movement = pickPreferredMovement(template, context);
-  if (!movement) return null;
+  const picked = pickPreferredMovement(template, context);
+  if (!picked) return null;
+  const { movement, substituted, originalName } = picked;
 
   const isComplex = movement.skill >= 5;
   let prescriptionText, sets, reps;
@@ -118,6 +153,10 @@ function buildSkill(template, context, minutes) {
       const loadKg = Math.round((oneRM * pct) / 2.5) * 2.5;
       prescriptionText += ` \u2014 carico leggero per la tecnica, ~${loadKg}kg (${Math.round(pct * 100)}%)`;
     }
+  }
+
+  if (substituted) {
+    prescriptionText += ` (sostituito a ${originalName}: attrezzatura ideale non disponibile in Profilo)`;
   }
 
   return {
@@ -161,7 +200,7 @@ function buildForTime(template, context) {
   const displayMovements = movements.map(({ movement }) => ({
     name: movement.name,
     repsText: `${perMovementReps}`,
-    loadText: loadTextFor(movement, scalingInfo.loadMult),
+    loadText: loadTextFor(movement, scalingInfo.loadMult, context.gender),
   }));
 
   const totalSeconds = movements.reduce((acc, { movement }) => acc + secPerRep(movement) * perMovementReps, 0);
@@ -197,7 +236,7 @@ function buildAmrapRounds(template, context) {
 
   const displayMovements = movements.map(({ movement }, i) => {
     const reps = Math.max(4, Math.round(baseReps * (1 - 0.2 * i) * scalingInfo.volumeMult));
-    return { name: movement.name, repsText: `${reps}`, loadText: loadTextFor(movement, scalingInfo.loadMult) };
+    return { name: movement.name, repsText: `${reps}`, loadText: loadTextFor(movement, scalingInfo.loadMult, context.gender) };
   });
 
   return {
@@ -228,7 +267,7 @@ function buildAmrapReps(template, context) {
     goalMatch: template.goals.includes(context.goal),
     structureText: `AMRAP reps ${durationMinutes}\u2019 \u2014 massime ripetizioni totali`,
     scoreType: `Reps totali (${unit})`,
-    displayMovements: [{ name: picked.movement.name, repsText: 'max', loadText: loadTextFor(picked.movement, scalingInfo.loadMult) }],
+    displayMovements: [{ name: picked.movement.name, repsText: 'max', loadText: loadTextFor(picked.movement, scalingInfo.loadMult, context.gender) }],
     targetRpe: template.target_rpe,
     capRpe: scalingInfo.capRPE,
     patternsHit: picked.movement.patterns,
@@ -253,7 +292,7 @@ function buildEmom(template, context) {
   const displayMovements = movements.map(({ movement }) => ({
     name: movement.name,
     repsText: `${repsPerMinute}`,
-    loadText: loadTextFor(movement, scalingInfo.loadMult),
+    loadText: loadTextFor(movement, scalingInfo.loadMult, context.gender),
   }));
 
   const rotationNote = movements.length > 1
@@ -289,7 +328,7 @@ function buildTabata(template, context) {
   const displayMovements = movements.map(({ movement }) => ({
     name: movement.name,
     repsText: `${roundsEach} round`,
-    loadText: loadTextFor(movement, scalingInfo.loadMult),
+    loadText: loadTextFor(movement, scalingInfo.loadMult, context.gender),
   }));
 
   const structureText = movements.length > 1
@@ -323,7 +362,7 @@ function buildDeathBy(template, context) {
     goalMatch: template.goals.includes(context.goal),
     structureText: `Death By \u2014 minuto 1: 1 rep, +1 rep ogni minuto (cap ${durationMinutes}\u2019)`,
     scoreType: 'Ultimo minuto completato per intero',
-    displayMovements: [{ name: picked.movement.name, repsText: '1, +1/min', loadText: loadTextFor(picked.movement, scalingInfo.loadMult) }],
+    displayMovements: [{ name: picked.movement.name, repsText: '1, +1/min', loadText: loadTextFor(picked.movement, scalingInfo.loadMult, context.gender) }],
     targetRpe: template.target_rpe,
     capRpe: scalingInfo.capRPE,
     patternsHit: picked.movement.patterns,
@@ -401,7 +440,7 @@ function instantiateCandidate(template, context) {
 export function generateWod(input) {
   const {
     goal, availableMinutes, level, equipment, limitations,
-    recentPatterns, forceRecovery, priorityMovementIds, oneRMs, recentTemplateIds,
+    recentPatterns, forceRecovery, priorityMovementIds, oneRMs, recentTemplateIds, gender,
   } = input;
 
   const band = input.band || readinessBand(input.readinessScore);
@@ -412,6 +451,7 @@ export function generateWod(input) {
     priorityMovementIds: priorityMovementIds || [],
     oneRMs: oneRMs || {},
     recentTemplateIds: recentTemplateIds || [],
+    gender: gender || null,
   };
 
   const isRecoveryTemplate = t => t.id === 'recovery_session' || t.id === 'recovery_technical';

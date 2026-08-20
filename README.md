@@ -72,3 +72,17 @@ Aggiungere un movimento o un template è questione di aggiungere una entry nei r
 - Sincronizzazione multi-dispositivo con Supabase (auth + database cloud) — utile anche per notifiche push reali su iPhone tramite un piccolo servizio backend.
 - Badge/traguardi motivazionali aggiuntivi.
 - App nativa Swift/SwiftUI se in futuro serve HealthKit, Apple Watch o notifiche push native.
+
+## Come verificare che un aggiornamento sia arrivato davvero
+
+In alto a sinistra, accanto al nome "Box Log", c'è un **numero di versione** (es. `v3 — 21 ago 2026`). Dopo ogni aggiornamento che carichi su GitHub:
+
+1. Aspetta 1-2 minuti che GitHub Pages ripubblichi il sito.
+2. Su iPhone, se l'app è già installata sulla Home, **chiudila del tutto** (swipe up e via dalle app recenti) e riaprila.
+3. Controlla il numero di versione in alto: se è cambiato, l'aggiornamento è arrivato. Se è lo stesso di prima, il telefono sta ancora mostrando la versione in cache — vai su Impostazioni Safari → Avanzate → Dati dei siti web, cerca il tuo dominio GitHub Pages e cancellalo, oppure rimuovi l'icona dalla Home e riaggiungila da Safari.
+
+Prima di questa versione, il Service Worker (il meccanismo che fa funzionare l'app offline) usava una cache "vecchia per sempre" che poteva mascherare gli aggiornamenti anche dopo un upload riuscito. Ora la cache si aggiorna automaticamente ad ogni nuova visita online.
+
+## Se carichi i file da iPad
+
+Il drag-and-drop di cartelle intere da Safari/File su iPad non è sempre affidabile. Se noti che l'app non si aggiorna nonostante tu abbia "caricato tutto", la causa più probabile è che l'upload sia stato parziale (mancano dei file dentro `js/`). Verifica direttamente su github.com, dentro il tuo repository, che la cartella `js/data/` contenga `warmups.js` — se manca, l'upload non è completo. Per lavori di questo tipo su iPad, un client Git dedicato come **Working Copy** è molto più affidabile del trascinamento tra app.

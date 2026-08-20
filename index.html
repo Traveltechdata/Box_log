@@ -20,6 +20,7 @@
     <div class="brand">
       <span class="dot-chain"><span></span><span></span><span></span></span>
       Box Log
+      <span class="version-badge" id="version-badge"></span>
     </div>
     <button class="btn-ghost" id="btn-help" aria-label="Info">?</button>
   </header>
@@ -177,6 +178,22 @@
 
   <!-- ================= PROFILO ================= -->
   <main class="view" id="view-profile">
+
+    <section class="card" id="profile-summary-card">
+      <h2>Profilo salvato</h2>
+      <div id="profile-summary"></div>
+    </section>
+
+    <section class="card">
+      <h2>Dati atleta</h2>
+      <span class="field-label">Nome</span>
+      <input type="text" id="in-firstname" placeholder="Nome" />
+      <span class="field-label">Cognome</span>
+      <input type="text" id="in-lastname" placeholder="Cognome" />
+      <span class="field-label">Genere</span>
+      <div class="chip-group" id="gender-chips"></div>
+    </section>
+
     <section class="card">
       <h2>Livello</h2>
       <div class="chip-group" id="level-chips"></div>
