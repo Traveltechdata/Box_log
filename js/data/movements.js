@@ -20,6 +20,8 @@ export const MOVEMENTS = [
   { id: 'front_squat', name: 'Front squat', patterns: ['squat'], modality: 'weightlifting', skill: 4, fatigue: 4, grip: 3, impact: 1, equipment: ['barbell', 'rack'], substitutions: ['goblet_squat', 'air_squat'] },
   { id: 'goblet_squat', name: 'Goblet squat', patterns: ['squat'], modality: 'weightlifting', skill: 2, fatigue: 2, grip: 2, impact: 1, equipment: ['kettlebell', 'dumbbell'], substitutions: ['air_squat'] },
   { id: 'thruster', name: 'Thruster', patterns: ['squat', 'press'], modality: 'weightlifting', skill: 3, fatigue: 5, grip: 3, impact: 1, equipment: ['barbell'], substitutions: ['dumbbell_thruster', 'goblet_squat'] },
+  { id: 'overhead_squat', name: 'Overhead squat', patterns: ['squat', 'press'], modality: 'weightlifting', skill: 5, fatigue: 4, grip: 2, impact: 1, equipment: ['barbell'], substitutions: ['front_squat', 'goblet_squat'] },
+  { id: 'pistol_squat', name: 'Pistol squat (monopodalico)', patterns: ['squat'], modality: 'gymnastics', skill: 5, fatigue: 3, grip: 1, impact: 1, equipment: [], substitutions: ['box_step_up', 'air_squat'] },
   { id: 'dumbbell_thruster', name: 'Dumbbell thruster', patterns: ['squat', 'press'], modality: 'weightlifting', skill: 2, fatigue: 4, grip: 3, impact: 1, equipment: ['dumbbell'], substitutions: ['goblet_squat'] },
   { id: 'wall_ball', name: 'Wall ball', patterns: ['squat', 'press'], modality: 'weightlifting', skill: 2, fatigue: 4, grip: 2, impact: 1, equipment: ['wall_ball'], substitutions: ['goblet_squat', 'air_squat'] },
   { id: 'box_step_up', name: 'Box step-up', patterns: ['squat', 'lunge'], modality: 'bodyweight', skill: 1, fatigue: 2, grip: 1, impact: 1, equipment: ['box'], substitutions: [] },
@@ -31,12 +33,14 @@ export const MOVEMENTS = [
   { id: 'kb_deadlift', name: 'Kettlebell deadlift', patterns: ['hinge'], modality: 'weightlifting', skill: 1, fatigue: 2, grip: 2, impact: 1, equipment: ['kettlebell'], substitutions: [] },
   { id: 'kb_swing', name: 'Kettlebell swing', patterns: ['hinge'], modality: 'weightlifting', skill: 2, fatigue: 3, grip: 3, impact: 1, equipment: ['kettlebell'], substitutions: ['kb_deadlift'] },
   { id: 'sdhp', name: 'Sumo deadlift high pull', patterns: ['hinge', 'pull'], modality: 'weightlifting', skill: 3, fatigue: 3, grip: 3, impact: 1, equipment: ['barbell'], substitutions: ['kb_swing'] },
+  { id: 'med_ball_clean', name: 'Medicine ball clean', patterns: ['hinge', 'squat'], modality: 'weightlifting', skill: 2, fatigue: 3, grip: 2, impact: 1, equipment: ['wall_ball'], substitutions: ['kb_deadlift'] },
   { id: 'good_morning', name: 'Good morning', patterns: ['hinge'], modality: 'weightlifting', skill: 3, fatigue: 2, grip: 1, impact: 1, equipment: ['barbell'], substitutions: [] },
   { id: 'ghd_situp', name: 'GHD sit-up', patterns: ['core', 'hinge'], modality: 'gymnastics', skill: 3, fatigue: 3, grip: 1, impact: 1, equipment: ['ghd'], substitutions: ['situp'] },
 
   // ---- Push / press ----
   { id: 'push_press', name: 'Push press', patterns: ['press'], modality: 'weightlifting', skill: 3, fatigue: 3, grip: 2, impact: 1, equipment: ['barbell'], substitutions: ['strict_press', 'dumbbell_press'] },
-  { id: 'strict_press', name: 'Strict press', patterns: ['press'], modality: 'weightlifting', skill: 2, fatigue: 3, grip: 2, impact: 1, equipment: ['barbell'], substitutions: ['dumbbell_press'] },
+  { id: 'strict_press', name: 'Strict press (shoulder press)', patterns: ['press'], modality: 'weightlifting', skill: 2, fatigue: 3, grip: 2, impact: 1, equipment: ['barbell'], substitutions: ['dumbbell_press'] },
+  { id: 'push_jerk', name: 'Push jerk', patterns: ['press'], modality: 'weightlifting', skill: 4, fatigue: 3, grip: 2, impact: 1, equipment: ['barbell'], substitutions: ['push_press', 'strict_press'] },
   { id: 'dumbbell_press', name: 'Dumbbell shoulder press', patterns: ['press'], modality: 'weightlifting', skill: 2, fatigue: 2, grip: 2, impact: 1, equipment: ['dumbbell'], substitutions: [] },
   { id: 'push_up', name: 'Push-up', patterns: ['push'], modality: 'bodyweight', skill: 1, fatigue: 2, grip: 1, impact: 1, equipment: [], substitutions: [] },
   { id: 'bench_press', name: 'Bench press', patterns: ['push'], modality: 'weightlifting', skill: 2, fatigue: 3, grip: 2, impact: 1, equipment: ['barbell', 'bench'], substitutions: ['push_up'] },
@@ -51,7 +55,13 @@ export const MOVEMENTS = [
   { id: 'ctb_pullup', name: 'Chest-to-bar pull-up', patterns: ['pull'], modality: 'gymnastics', skill: 5, fatigue: 4, grip: 5, impact: 1, equipment: ['pullup_bar'], substitutions: ['kipping_pullup', 'pull_up', 'ring_row'] },
   { id: 'ring_row', name: 'Ring row', patterns: ['pull'], modality: 'gymnastics', skill: 1, fatigue: 2, grip: 2, impact: 1, equipment: ['rings'], substitutions: [] },
   { id: 'jumping_pullup', name: 'Jumping pull-up', patterns: ['pull'], modality: 'gymnastics', skill: 1, fatigue: 2, grip: 2, impact: 1, equipment: ['pullup_bar'], substitutions: ['ring_row'] },
-  { id: 'muscle_up', name: 'Muscle-up', patterns: ['pull', 'push'], modality: 'gymnastics', skill: 5, fatigue: 5, grip: 5, impact: 1, equipment: ['rings'], substitutions: ['ctb_pullup', 'kipping_pullup', 'ring_row'] },
+  { id: 'muscle_up', name: 'Muscle-up (anelli)', patterns: ['pull', 'push'], modality: 'gymnastics', skill: 5, fatigue: 5, grip: 5, impact: 1, equipment: ['rings'], substitutions: ['ctb_pullup', 'kipping_pullup', 'ring_row'] },
+  { id: 'bar_muscle_up', name: 'Bar muscle-up', patterns: ['pull', 'push'], modality: 'gymnastics', skill: 5, fatigue: 5, grip: 5, impact: 1, equipment: ['pullup_bar'], substitutions: ['ctb_pullup', 'kipping_pullup', 'ring_row'] },
+  { id: 'rope_climb', name: 'Rope climb', patterns: ['pull'], modality: 'gymnastics', skill: 4, fatigue: 4, grip: 5, impact: 1, equipment: ['rope'], substitutions: ['ring_row'] },
+  { id: 'ring_dip', name: 'Ring dip', patterns: ['push'], modality: 'gymnastics', skill: 4, fatigue: 3, grip: 2, impact: 1, equipment: ['rings'], substitutions: ['push_up'] },
+  { id: 'handstand_walk', name: 'Handstand walk', patterns: ['press'], modality: 'gymnastics', skill: 5, fatigue: 3, grip: 1, impact: 1, equipment: [], substitutions: ['hspu', 'pike_pushup'] },
+  { id: 'wall_walk', name: 'Wall walk', patterns: ['press'], modality: 'gymnastics', skill: 4, fatigue: 3, grip: 1, impact: 1, equipment: [], substitutions: ['pike_pushup'] },
+  { id: 'l_sit', name: 'L-sit', patterns: ['core'], modality: 'gymnastics', skill: 4, fatigue: 2, grip: 3, impact: 1, equipment: [], substitutions: ['hanging_knee_raise'] },
   { id: 'barbell_row', name: 'Barbell row', patterns: ['pull'], modality: 'weightlifting', skill: 3, fatigue: 3, grip: 3, impact: 1, equipment: ['barbell'], substitutions: ['ring_row'] },
   { id: 'toes_to_bar', name: 'Toes-to-bar', patterns: ['core', 'pull'], modality: 'gymnastics', skill: 4, fatigue: 3, grip: 4, impact: 1, equipment: ['pullup_bar'], substitutions: ['hanging_knee_raise', 'situp'] },
   { id: 'hanging_knee_raise', name: 'Hanging knee raise', patterns: ['core'], modality: 'gymnastics', skill: 2, fatigue: 2, grip: 3, impact: 1, equipment: ['pullup_bar'], substitutions: ['situp'] },
@@ -70,6 +80,16 @@ export const MOVEMENTS = [
 
   // ---- Carry ----
   { id: 'farmers_carry', name: "Farmer's carry", patterns: ['carry'], modality: 'weightlifting', skill: 1, fatigue: 2, grip: 4, impact: 1, equipment: ['kettlebell', 'dumbbell'], substitutions: [] },
+  { id: 'yoke_carry', name: 'Yoke carry', patterns: ['carry'], modality: 'weightlifting', skill: 2, fatigue: 3, grip: 2, impact: 1, equipment: ['yoke'], substitutions: ['farmers_carry'] },
+  { id: 'sandbag_carry', name: 'Sandbag carry', patterns: ['carry'], modality: 'weightlifting', skill: 1, fatigue: 3, grip: 3, impact: 1, equipment: ['sandbag'], substitutions: ['farmers_carry'] },
+  { id: 'sled_push', name: 'Sled push', patterns: ['carry', 'squat'], modality: 'weightlifting', skill: 1, fatigue: 4, grip: 2, impact: 1, equipment: ['sled'], substitutions: [] },
+  { id: 'sled_pull', name: 'Sled pull', patterns: ['carry', 'pull'], modality: 'weightlifting', skill: 1, fatigue: 4, grip: 3, impact: 1, equipment: ['sled'], substitutions: [] },
+
+  // ---- Dumbbell / kettlebell odd-object variety ----
+  { id: 'db_snatch', name: 'Dumbbell snatch', patterns: ['olympic', 'hinge'], modality: 'weightlifting', skill: 3, fatigue: 3, grip: 3, impact: 1, equipment: ['dumbbell'], substitutions: ['kb_swing'] },
+  { id: 'db_clean', name: 'Dumbbell clean', patterns: ['olympic', 'hinge'], modality: 'weightlifting', skill: 2, fatigue: 3, grip: 3, impact: 1, equipment: ['dumbbell'], substitutions: ['kb_deadlift'] },
+  { id: 'devil_press', name: 'Devil press', patterns: ['olympic', 'push'], modality: 'weightlifting', skill: 3, fatigue: 5, grip: 3, impact: 2, equipment: ['dumbbell'], substitutions: ['burpee'] },
+  { id: 'kb_clean', name: 'Kettlebell clean', patterns: ['olympic', 'hinge'], modality: 'weightlifting', skill: 2, fatigue: 3, grip: 3, impact: 1, equipment: ['kettlebell'], substitutions: ['kb_deadlift'] },
 
   // ---- Recovery / mobility (used in low-readiness sessions) ----
   { id: 'mobility_flow', name: 'Mobilità guidata', patterns: ['mobility'], modality: 'bodyweight', skill: 1, fatigue: 1, grip: 1, impact: 1, equipment: [], recoveryOnly: true, substitutions: [] },

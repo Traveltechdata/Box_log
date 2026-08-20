@@ -267,6 +267,96 @@ textarea { min-height: 60px; resize: vertical; }
 .empty-state { text-align: center; padding: 40px 16px; color: var(--chalk-dim); }
 .empty-state svg { margin-bottom: 14px; opacity: 0.6; }
 
+/* ---------- view toggle (list/calendar) ---------- */
+.view-toggle { display: flex; gap: 6px; margin-bottom: 16px; background: var(--board); border-radius: 999px; padding: 4px; }
+.toggle-btn {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--chalk-dim);
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: 12px;
+  padding: 8px 0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.toggle-btn.active { background: var(--marker-yellow); color: #1C211D; font-weight: 600; }
+
+/* ---------- motivation card ---------- */
+#motivation-card { border-color: var(--marker-teal); }
+#motivation-message { color: var(--chalk); font-size: 14px; margin: 4px 0 8px; }
+
+/* ---------- calendar ---------- */
+.cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.cal-header span { font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.04em; font-size: 14px; }
+.cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; margin-bottom: 4px; }
+.cal-weekday { font-size: 11px; color: var(--chalk-dim); font-family: var(--font-mono); padding: 4px 0; }
+.cal-week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; margin-bottom: 3px; }
+.cal-cell {
+  aspect-ratio: 1;
+  background: var(--board);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--chalk);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 0;
+}
+.cal-cell.empty { background: transparent; border: none; cursor: default; }
+.cal-cell.today { border-color: var(--marker-yellow); }
+.cal-cell.selected { background: var(--board-raised); border-color: var(--marker-teal); }
+.cal-dots { display: flex; gap: 2px; height: 6px; }
+.cal-dot { width: 5px; height: 5px; border-radius: 50%; display: inline-block; }
+.cal-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; font-size: 11px; color: var(--chalk-dim); }
+.cal-legend span { display: flex; align-items: center; gap: 5px; }
+.cal-legend .cal-dot { width: 7px; height: 7px; }
+#cal-day-detail { margin-top: 14px; }
+#cal-day-detail .card { background: var(--board-raised); }
+
+/* ---------- goals ---------- */
+.goal-item { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 12px; }
+.goal-item .row1 { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+.goal-item .goal-title { font-weight: 600; font-size: 15px; }
+.goal-item .goal-days { font-family: var(--font-mono); font-size: 11px; color: var(--chalk-dim); }
+.goal-bar-track { height: 8px; background: var(--board); border-radius: 999px; overflow: hidden; margin: 8px 0; }
+.goal-bar-fill { height: 100%; border-radius: 999px; transition: width 0.3s; }
+.goal-values { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 12px; color: var(--chalk-dim); }
+.goal-status-badge { font-size: 10.5px; padding: 2px 8px; border-radius: 999px; font-family: var(--font-mono); text-transform: uppercase; }
+.goal-actions { display: flex; gap: 8px; margin-top: 10px; }
+.goal-actions .btn { padding: 8px 10px; font-size: 11.5px; }
+
+.select-input {
+  width: 100%;
+  background: var(--board);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--chalk);
+  font-family: var(--font-body);
+  font-size: 14px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+input[type="date"], input[type="time"] {
+  width: 100%;
+  background: var(--board);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--chalk);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  color-scheme: dark;
+}
+
 /* ---------- toast ---------- */
 #toast {
   position: fixed;

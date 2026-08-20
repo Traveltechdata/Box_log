@@ -87,10 +87,45 @@
 
   <!-- ================= STORICO ================= -->
   <main class="view" id="view-history">
-    <section class="card">
-      <h2>Ultime sessioni</h2>
-      <div id="history-list"></div>
+
+    <section class="card" id="motivation-card" style="display:none;">
+      <h3 id="motivation-eyebrow">Costanza</h3>
+      <p id="motivation-message" class="small"></p>
+      <div class="wod-meta" id="motivation-stats"></div>
     </section>
+
+    <section class="card">
+      <div class="view-toggle" id="history-view-toggle">
+        <button type="button" class="toggle-btn active" data-mode="list">Lista</button>
+        <button type="button" class="toggle-btn" data-mode="calendar">Calendario</button>
+      </div>
+
+      <div id="history-list-mode">
+        <h2>Carico di allenamento</h2>
+        <div id="load-chart"></div>
+        <p class="small muted" id="load-chart-empty" style="display:none;">Segna qualche sessione come svolta per vedere il trend del carico.</p>
+        <hr class="chalk-rule" />
+        <h2>Ultime sessioni</h2>
+        <div id="history-list"></div>
+      </div>
+
+      <div id="history-calendar-mode" style="display:none;">
+        <div class="cal-header">
+          <button type="button" class="btn-ghost" id="cal-prev">&lsaquo;</button>
+          <span id="cal-month-label"></span>
+          <button type="button" class="btn-ghost" id="cal-next">&rsaquo;</button>
+        </div>
+        <div class="cal-weekdays" id="cal-weekdays"></div>
+        <div id="cal-grid"></div>
+        <div class="cal-legend">
+          <span><i class="cal-dot" style="background:var(--marker-teal)"></i> svolto</span>
+          <span><i class="cal-dot" style="background:var(--marker-yellow)"></i> pianificato</span>
+          <span><i class="cal-dot" style="background:var(--marker-red)"></i> generato, non segnato</span>
+        </div>
+        <div id="cal-day-detail"></div>
+      </div>
+    </section>
+
     <section class="card">
       <h3>Dati</h3>
       <p class="small muted">I dati restano solo su questo dispositivo/browser. Esportali per fare un backup o per spostarli su un altro dispositivo.</p>
@@ -99,6 +134,44 @@
         <button class="btn btn-secondary" id="btn-import">Importa JSON</button>
       </div>
       <input type="file" id="import-file" accept="application/json" style="display:none;" />
+    </section>
+  </main>
+
+  <!-- ================= OBIETTIVI ================= -->
+  <main class="view" id="view-goals">
+    <section class="card">
+      <h2>I tuoi obiettivi</h2>
+      <div id="goals-list"></div>
+    </section>
+
+    <section class="card">
+      <h2>Nuovo obiettivo</h2>
+      <span class="field-label">Movimento o metrica</span>
+      <select id="goal-movement" class="select-input"></select>
+      <input type="text" id="goal-label-custom" placeholder="Nome obiettivo (se 'Altro')" style="display:none;" />
+
+      <div style="display:flex; gap:10px;">
+        <div style="flex:1;">
+          <span class="field-label">Valore attuale</span>
+          <input type="number" id="goal-start" placeholder="es. 90" />
+        </div>
+        <div style="flex:1;">
+          <span class="field-label">Obiettivo</span>
+          <input type="number" id="goal-target" placeholder="es. 110" />
+        </div>
+      </div>
+
+      <span class="field-label">Unità</span>
+      <div class="chip-group" id="goal-unit-chips"></div>
+
+      <span class="field-label">Direzione</span>
+      <div class="chip-group" id="goal-direction-chips"></div>
+
+      <span class="field-label">Scadenza</span>
+      <div class="chip-group" id="goal-date-chips"></div>
+      <input type="date" id="goal-date-custom" />
+
+      <button class="btn btn-primary" id="btn-add-goal" style="margin-top:6px;">Aggiungi obiettivo</button>
     </section>
   </main>
 
@@ -125,6 +198,19 @@
       <textarea id="in-notes" placeholder="Es. fastidio alla spalla destra in overhead, evitare impatti sul ginocchio sinistro…"></textarea>
     </section>
 
+    <section class="card">
+      <h2>Promemoria allenamento</h2>
+      <p class="small muted" id="reminder-support-note"></p>
+      <label class="check-item" id="reminder-toggle-row" style="margin-bottom:12px;">
+        <input type="checkbox" id="reminder-enabled" /> <span>Attiva promemoria</span>
+      </label>
+      <span class="field-label">Giorni</span>
+      <div class="chip-group" id="reminder-days-chips"></div>
+      <span class="field-label">Orario</span>
+      <input type="time" id="reminder-time" value="18:00" />
+      <button class="btn btn-secondary" id="btn-save-reminders" style="margin-top:10px;">Salva promemoria</button>
+    </section>
+
     <button class="btn btn-primary" id="btn-save-profile">Salva profilo</button>
     <button class="btn btn-ghost" id="btn-reset" style="margin-top:14px;">Azzera tutti i dati dell'app</button>
   </main>
@@ -137,6 +223,10 @@
     <button class="tab-btn" data-view="view-history">
       <span class="tab-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-6 4 3 5-8"/></svg></span>
       Storico
+    </button>
+    <button class="tab-btn" data-view="view-goals">
+      <span class="tab-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="3"/></svg></span>
+      Obiettivi
     </button>
     <button class="tab-btn" data-view="view-profile">
       <span class="tab-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 5-6 8-6s6.5 2 8 6"/></svg></span>

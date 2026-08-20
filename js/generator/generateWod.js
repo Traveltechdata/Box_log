@@ -81,13 +81,14 @@ export function generateWod(input) {
   const {
     goal, availableMinutes, level, equipment, limitations,
     recentPatterns, energy, sleep, stress, soreness, forceRecovery,
+    priorityMovementIds,
   } = input;
 
   const band = input.band || readinessBand(input.readinessScore);
 
   const context = {
     goal, availableMinutes, level, equipment, limitations,
-    recentPatterns, readinessBand: band,
+    recentPatterns, readinessBand: band, priorityMovementIds: priorityMovementIds || [],
   };
 
   const isRecoveryTemplate = t => t.id === 'recovery_session' || t.id === 'recovery_technical';
@@ -95,7 +96,8 @@ export function generateWod(input) {
   let pool = TEMPLATES.filter(t =>
     t.goals.includes(goal) &&
     availableMinutes >= t.time_domain[0] * 0.5 &&
-    !isRecoveryTemplate(t)
+    !isRecoveryTemplate(t) &&
+    (!t.high_readiness_only || band.key === 'high')
   );
 
   if (forceRecovery || band.key === 'low') {

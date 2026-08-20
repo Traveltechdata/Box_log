@@ -2,7 +2,7 @@ import { MOVEMENTS, getMovement } from '../data/movements.js';
 
 // Pick the best movement for a slot given equipment, limitations, level and recent history.
 export function pickMovement(slot, context, usedIds) {
-  const { equipment, limitations, level, recentPatterns } = context;
+  const { equipment, limitations, level, recentPatterns, priorityMovementIds = [] } = context;
 
   const candidates = MOVEMENTS.filter(m =>
     m.patterns.includes(slot.pattern) &&
@@ -24,6 +24,8 @@ export function pickMovement(slot, context, usedIds) {
     score -= recentCount * 5;
     // mild preference for lower fatigue/grip cost as a tiebreaker
     score -= (m.fatigue + m.grip) * 0.5;
+    // boost movements tied to an active quarterly goal
+    if (priorityMovementIds.includes(m.id)) score += 25;
     return { movement: m, score, hasEquipment };
   });
 
