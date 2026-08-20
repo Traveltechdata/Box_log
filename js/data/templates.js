@@ -1,0 +1,180 @@
+// Templates describe the SHAPE of a session, not the exact movements.
+// duration: default main-block minutes at readiness 100 (scaled at runtime)
+// movement_slots: each slot names a pattern + modality the generator must fill
+// goals: which athlete goals this template serves well
+
+export const TEMPLATES = [
+  {
+    id: 'short_metcon_amrap',
+    label: 'Metcon breve (AMRAP)',
+    goals: ['conditioning', 'general'],
+    format: 'AMRAP',
+    time_domain: [8, 16],
+    duration: 12,
+    movement_slots: [
+      { pattern: 'cyclical', modality: 'monostructural' },
+      { pattern: 'squat', modality: 'weightlifting' },
+      { pattern: 'push', modality: 'bodyweight' },
+    ],
+    target_rpe: [7, 8],
+    stimulus: 'ritmo sostenibile, poche pause',
+  },
+  {
+    id: 'long_metcon_fortime',
+    label: 'Metcon lungo (For Time)',
+    goals: ['conditioning', 'race_prep'],
+    format: 'For Time',
+    time_domain: [16, 28],
+    duration: 20,
+    movement_slots: [
+      { pattern: 'cyclical', modality: 'monostructural' },
+      { pattern: 'hinge', modality: 'weightlifting' },
+      { pattern: 'pull', modality: 'gymnastics' },
+    ],
+    target_rpe: [7, 9],
+    stimulus: 'pacing controllato, gestione del fiato su volume alto',
+  },
+  {
+    id: 'interval_conditioning',
+    label: 'Interval training',
+    goals: ['conditioning', 'aerobic'],
+    format: 'Intervals',
+    time_domain: [12, 24],
+    duration: 16,
+    movement_slots: [
+      { pattern: 'cyclical', modality: 'monostructural' },
+      { pattern: 'core', modality: 'bodyweight' },
+    ],
+    target_rpe: [7, 8],
+    stimulus: 'lavoro:riposo definito, intensità ripetibile ogni round',
+  },
+  {
+    id: 'strength_progression',
+    label: 'Forza (serie pesanti)',
+    goals: ['strength'],
+    format: 'Strength',
+    time_domain: [15, 25],
+    duration: 20,
+    movement_slots: [
+      { pattern: 'squat', modality: 'weightlifting' },
+    ],
+    target_rpe: [6, 8],
+    stimulus: 'basse ripetizioni, recupero quasi completo, tecnica prioritaria',
+  },
+  {
+    id: 'strength_hinge',
+    label: 'Forza (hinge pesante)',
+    goals: ['strength'],
+    format: 'Strength',
+    time_domain: [15, 25],
+    duration: 20,
+    movement_slots: [
+      { pattern: 'hinge', modality: 'weightlifting' },
+    ],
+    target_rpe: [6, 8],
+    stimulus: 'basse ripetizioni, recupero quasi completo, tecnica prioritaria',
+  },
+  {
+    id: 'olympic_emom',
+    label: 'Weightlifting EMOM',
+    goals: ['weightlifting'],
+    format: 'EMOM',
+    time_domain: [10, 20],
+    duration: 14,
+    movement_slots: [
+      { pattern: 'olympic', modality: 'weightlifting' },
+    ],
+    target_rpe: [6, 8],
+    stimulus: 'qualità tecnica e velocità, carico submassimale',
+  },
+  {
+    id: 'gymnastics_skill',
+    label: 'Skill ginnastico',
+    goals: ['gymnastics'],
+    format: 'E2MOM',
+    time_domain: [12, 20],
+    duration: 16,
+    movement_slots: [
+      { pattern: 'pull', modality: 'gymnastics' },
+      { pattern: 'press', modality: 'gymnastics' },
+    ],
+    target_rpe: [5, 7],
+    stimulus: 'volume tecnico controllato, qualità del movimento',
+  },
+  {
+    id: 'engine_zone2',
+    label: 'Aerobico Zona 2',
+    goals: ['aerobic', 'general'],
+    format: 'Steady',
+    time_domain: [20, 45],
+    duration: 30,
+    movement_slots: [
+      { pattern: 'cyclical', modality: 'monostructural' },
+    ],
+    target_rpe: [4, 6],
+    stimulus: 'intensità stabile e bassa, nessun accumulo di fatica locale',
+  },
+  {
+    id: 'chipper',
+    label: 'Chipper',
+    goals: ['conditioning', 'race_prep', 'general'],
+    format: 'For Time',
+    time_domain: [14, 26],
+    duration: 18,
+    movement_slots: [
+      { pattern: 'squat', modality: 'weightlifting' },
+      { pattern: 'pull', modality: 'gymnastics' },
+      { pattern: 'core', modality: 'gymnastics' },
+      { pattern: 'cyclical', modality: 'monostructural' },
+    ],
+    target_rpe: [7, 9],
+    stimulus: 'lista lunga di movimenti, un solo passaggio, gestione dell\u2019energia',
+  },
+  {
+    id: 'couplet_heavy',
+    label: 'Couplet con carico',
+    goals: ['conditioning', 'strength'],
+    format: 'For Time',
+    time_domain: [8, 16],
+    duration: 10,
+    movement_slots: [
+      { pattern: 'hinge', modality: 'weightlifting' },
+      { pattern: 'push', modality: 'bodyweight' },
+    ],
+    target_rpe: [7, 9],
+    stimulus: 'carico moderato-alto, round brevi e intensi',
+  },
+  {
+    id: 'recovery_technical',
+    label: 'Tecnica leggera',
+    goals: ['general', 'aerobic', 'conditioning', 'strength', 'weightlifting', 'gymnastics'],
+    format: 'Technical',
+    time_domain: [10, 30],
+    duration: 18,
+    movement_slots: [
+      { pattern: 'squat', modality: 'weightlifting' },
+      { pattern: 'cyclical', modality: 'monostructural' },
+    ],
+    target_rpe: [3, 5],
+    stimulus: 'qualità del movimento, carico leggero, nessuna fretta',
+    low_readiness_only: false,
+  },
+  {
+    id: 'recovery_session',
+    label: 'Recovery / mobilità',
+    goals: ['general', 'aerobic', 'conditioning', 'strength', 'weightlifting', 'gymnastics', 'race_prep'],
+    format: 'Recovery',
+    time_domain: [10, 40],
+    duration: 20,
+    movement_slots: [
+      { pattern: 'mobility', modality: 'bodyweight' },
+      { pattern: 'cyclical', modality: 'monostructural' },
+    ],
+    target_rpe: [2, 4],
+    stimulus: 'recupero attivo, nessun accumulo di fatica',
+  },
+];
+
+export function getTemplate(id) {
+  return TEMPLATES.find(t => t.id === id);
+}
