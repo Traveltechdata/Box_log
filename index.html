@@ -88,9 +88,13 @@
     <!-- STATE C: active session in progress -->
     <div id="session-wrap" style="display:none;">
       <section class="card" id="session-header-card">
-        <div class="session-badge" id="session-kind-badge"></div>
+        <div class="session-header-row">
+          <div class="session-badge" id="session-kind-badge"></div>
+          <div class="session-timer" id="session-timer">0:00</div>
+        </div>
         <div class="wod-title" id="session-title">–</div>
         <div class="wod-stimulus" id="session-subtitle"></div>
+        <button type="button" class="btn-ghost" id="btn-cancel-session">Annulla sessione (torna alla home)</button>
       </section>
 
       <section class="card" id="session-content-card">

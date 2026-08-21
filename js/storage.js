@@ -62,7 +62,7 @@ export function deleteSessionById(id) {
 // Patterns hit in the last N *completed* sessions (used for variety/fatigue scoring).
 export function recentPatterns(count = 2) {
   const sessions = getSessions()
-    .filter(s => s.status !== 'planned' && s.completed !== false)
+    .filter(s => s.status !== 'planned' && s.completion !== 0)
     .slice(0, count);
   return sessions.flatMap(s => s.patternsHit || []);
 }
@@ -86,7 +86,7 @@ export function sessionsInMonth(year, month) {
 
 export function completedSessionsSorted() {
   return getSessions()
-    .filter(s => s.status !== 'planned' && s.completed && s.load != null)
+    .filter(s => s.status !== 'planned' && s.completion > 0 && s.load != null)
     .sort((a, b) => new Date(a.date) - new Date(b.date));
 }
 

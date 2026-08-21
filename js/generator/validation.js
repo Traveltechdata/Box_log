@@ -40,6 +40,15 @@ export function score(candidate, context) {
   if (templateRecencyIndex === 0) s -= 50;
   else if (templateRecencyIndex > 0) s -= 25;
 
+  // Strongly discourage patterns explicitly flagged to avoid (e.g. the pattern
+  // just trained in today's Strength/Skill focus block) - a firmer signal than
+  // the general history-based variety penalty above.
+  const avoidPatterns = context.avoidPatterns || [];
+  const avoidHits = candidate.mainMovements.reduce((acc, item) => {
+    return acc + item.movement.patterns.filter(p => avoidPatterns.includes(p)).length;
+  }, 0);
+  s -= avoidHits * 30;
+
   const gripLoad = candidate.mainMovements.reduce((acc, item) => acc + item.movement.grip, 0);
   if (gripLoad > 10) s -= (gripLoad - 10) * 2;
 

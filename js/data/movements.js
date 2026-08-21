@@ -96,8 +96,31 @@ export const MOVEMENTS = [
   { id: 'zone2_bike', name: 'Bike Zona 2', patterns: ['cyclical'], modality: 'monostructural', skill: 1, fatigue: 1, grip: 1, impact: 1, equipment: ['bike'], recoveryOnly: true, substitutions: ['zone2_row', 'zone2_walk'] },
   { id: 'zone2_row', name: 'Row Zona 2', patterns: ['cyclical'], modality: 'monostructural', skill: 1, fatigue: 1, grip: 1, impact: 1, equipment: ['rower'], recoveryOnly: true, substitutions: ['zone2_walk'] },
   { id: 'zone2_walk', name: 'Camminata veloce', patterns: ['cyclical'], modality: 'monostructural', skill: 1, fatigue: 1, grip: 1, impact: 1, equipment: [], recoveryOnly: true, substitutions: [] },
+
+  // ---- Olympic variants (hang / squat style) ----
+  { id: 'hang_power_clean', name: 'Hang power clean', patterns: ['olympic', 'hinge'], modality: 'weightlifting', skill: 4, fatigue: 4, grip: 3, impact: 1, equipment: ['barbell'], loadRx: { m: 52, f: 36 }, substitutions: ['power_clean', 'kb_swing'] },
+  { id: 'hang_squat_clean', name: 'Hang squat clean', patterns: ['olympic', 'squat'], modality: 'weightlifting', skill: 5, fatigue: 5, grip: 3, impact: 1, equipment: ['barbell'], loadRx: { m: 61, f: 43 }, substitutions: ['hang_power_clean', 'power_clean'] },
+  { id: 'hang_power_snatch', name: 'Hang power snatch', patterns: ['olympic', 'hinge'], modality: 'weightlifting', skill: 4, fatigue: 4, grip: 4, impact: 1, equipment: ['barbell'], loadRx: { m: 38, f: 27 }, substitutions: ['power_snatch', 'kb_swing'] },
+  { id: 'hang_squat_snatch', name: 'Hang squat snatch', patterns: ['olympic', 'squat'], modality: 'weightlifting', skill: 5, fatigue: 5, grip: 4, impact: 1, equipment: ['barbell'], loadRx: { m: 43, f: 30 }, substitutions: ['hang_power_snatch', 'power_snatch'] },
+
+  // ---- Bodyweight / accessory ----
+  { id: 'push_up_plus', name: 'Push-up (deficit/plyo)', patterns: ['push'], modality: 'bodyweight', skill: 3, fatigue: 3, grip: 1, impact: 1, equipment: [], substitutions: ['push_up'] },
+  { id: 'ring_push_up', name: 'Ring push-up', patterns: ['push'], modality: 'gymnastics', skill: 3, fatigue: 3, grip: 2, impact: 1, equipment: ['rings'], substitutions: ['push_up'] },
+  { id: 'bulgarian_split_squat', name: 'Bulgarian split squat', patterns: ['lunge', 'squat'], modality: 'weightlifting', skill: 2, fatigue: 3, grip: 1, impact: 1, equipment: ['dumbbell'], loadRx: { m: 20, f: 14 }, substitutions: ['lunge'] },
+  { id: 'step_down', name: 'Box step-down', patterns: ['lunge'], modality: 'bodyweight', skill: 1, fatigue: 2, grip: 1, impact: 1, equipment: ['box'], substitutions: [] },
+  { id: 'broad_jump', name: 'Broad jump', patterns: ['jump', 'squat'], modality: 'bodyweight', skill: 2, fatigue: 3, grip: 1, impact: 3, equipment: [], substitutions: ['box_step_up'] },
+  { id: 'turkish_get_up', name: 'Turkish get-up', patterns: ['press', 'core'], modality: 'weightlifting', skill: 4, fatigue: 3, grip: 3, impact: 1, equipment: ['kettlebell'], loadRx: { m: 16, f: 12 }, substitutions: ['plank'] },
+  { id: 'renegade_row', name: 'Renegade row', patterns: ['pull', 'core'], modality: 'weightlifting', skill: 3, fatigue: 3, grip: 4, impact: 1, equipment: ['dumbbell'], loadRx: { m: 20, f: 14 }, substitutions: ['barbell_row'] },
+  { id: 'man_maker', name: 'Man maker', patterns: ['push', 'pull', 'squat'], modality: 'weightlifting', skill: 3, fatigue: 5, grip: 3, impact: 2, equipment: ['dumbbell'], loadRx: { m: 20, f: 14 }, substitutions: ['burpee'] },
+  { id: 'single_leg_rdl', name: 'Single-leg RDL', patterns: ['hinge', 'lunge'], modality: 'weightlifting', skill: 3, fatigue: 2, grip: 2, impact: 1, equipment: ['dumbbell'], loadRx: { m: 16, f: 12 }, substitutions: ['good_morning'] },
+  { id: 'ghd_back_extension', name: 'GHD back extension', patterns: ['hinge', 'core'], modality: 'gymnastics', skill: 2, fatigue: 2, grip: 1, impact: 1, equipment: ['ghd'], substitutions: ['good_morning'] },
+  { id: 'deadbug', name: 'Dead bug', patterns: ['core'], modality: 'bodyweight', skill: 1, fatigue: 1, grip: 1, impact: 1, equipment: [], substitutions: [] },
+  { id: 'side_plank', name: 'Side plank', patterns: ['core'], modality: 'bodyweight', skill: 1, fatigue: 1, grip: 1, impact: 1, equipment: [], substitutions: ['plank'] },
+  { id: 'v_up', name: 'V-up', patterns: ['core'], modality: 'bodyweight', skill: 2, fatigue: 2, grip: 1, impact: 1, equipment: [], substitutions: ['situp'] },
+  { id: 'battle_ropes', name: 'Battle ropes', patterns: ['cyclical', 'push'], modality: 'monostructural', skill: 1, fatigue: 3, grip: 3, impact: 1, equipment: ['battle_ropes'], substitutions: ['burpee'] },
 ];
 
 export function getMovement(id) {
   return MOVEMENTS.find(m => m.id === id);
 }
+

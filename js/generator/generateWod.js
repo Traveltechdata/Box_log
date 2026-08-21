@@ -474,7 +474,7 @@ export function generateWod(input) {
   const {
     goal, availableMinutes, level, equipment, limitations,
     recentPatterns, forceRecovery, priorityMovementIds, oneRMs, recentTemplateIds, gender,
-    forceFormat,
+    forceFormat, avoidPatterns,
   } = input;
 
   const band = input.band || readinessBand(input.readinessScore);
@@ -486,17 +486,36 @@ export function generateWod(input) {
     oneRMs: oneRMs || {},
     recentTemplateIds: recentTemplateIds || [],
     gender: gender || null,
+    avoidPatterns: avoidPatterns || [],
   };
 
   const isRecoveryTemplate = t => t.id === 'recovery_session' || t.id === 'recovery_technical';
+  // A template whose only movement slot is a pattern we're avoiding (e.g. a
+  // squat-only Tabata right after a squat-focused Strength block) is dropped
+  // outright when other templates can still fill the goal/time window.
+  const isPureAvoidTemplate = t => (avoidPatterns || []).length > 0 &&
+    t.movement_slots.length === 1 && (avoidPatterns || []).includes(t.movement_slots[0].pattern);
 
   let pool = TEMPLATES.filter(t =>
     t.goals.includes(goal) &&
     availableMinutes >= t.time_domain[0] * 0.5 &&
     !isRecoveryTemplate(t) &&
     (!t.high_readiness_only || band.key === 'high') &&
-    (!forceFormat || t.format === forceFormat)
+    (!forceFormat || t.format === forceFormat) &&
+    !isPureAvoidTemplate(t)
   );
+
+  if (pool.length === 0) {
+    // Dropping the pure-avoid filter first is a smaller compromise than
+    // dropping the format constraint below.
+    pool = TEMPLATES.filter(t =>
+      t.goals.includes(goal) &&
+      availableMinutes >= t.time_domain[0] * 0.5 &&
+      !isRecoveryTemplate(t) &&
+      (!t.high_readiness_only || band.key === 'high') &&
+      (!forceFormat || t.format === forceFormat)
+    );
+  }
 
   if (pool.length === 0 && forceFormat) {
     // The requested format doesn't exist for this goal/time window — drop the

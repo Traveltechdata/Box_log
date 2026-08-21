@@ -11,15 +11,16 @@ Web app personale (PWA) strutturata come un vero percorso di allenamento: crei u
 - **Rotazione automatica**: ogni giorno l'app calcola quale piano attivo e piu "in ritardo" rispetto alla sua cadenza settimanale e lo propone - non serve un calendario fisso da gestire a mano.
 - **Sessione**: ha un ciclo di vita esplicito.
   1. **Inizia sessione** -> scegli guidata dal piano / monostrutturale / manuale, poi imposti tempo disponibile e stato fisico **una sola volta**. Questi valori restano bloccati per tutta la sessione (persistiti, sopravvivono a cambi di tab o al chiudere l'app).
-  2. **Esecuzione** -> contenuto specifico per tipo (warm-up mirato + prescrizione Forza/Skill/metcon, oppure form libero per monostrutturali/manuale).
-  3. **Termina sessione** -> completamento 100% / 50% / non eseguito + RPE. Questo aggiorna il piano collegato e va nello storico.
+  2. **Esecuzione** -> ogni sessione guidata (Forza o Skill) segue sempre la struttura completa **Warm-up -> fase centrale -> WOD**: il WOD finale evita attivamente il pattern di movimento appena lavorato (es. dopo il back squat, il WOD non ripropone movimenti squat), con un timer visibile che scorre durante tutta la sessione.
+  3. **Termina sessione** -> completamento 100% / 50% / non eseguito + RPE. Questo aggiorna il piano collegato e va nello storico. In qualsiasi momento puoi premere **Annulla sessione** per tornare alla home senza salvare nulla, se cambi idea.
 - **Sotto i 30 minuti** l'app non salta l'allenamento ne comprime uno step pieno: propone mobilita o un movimento leggero. Da 30 a 90 minuti la durata scala normalmente.
+- **Piu piani in parallelo**: puoi avere piu piani attivi contemporaneamente, anche dello stesso tipo (es. due piani Forza su movimenti diversi) - la rotazione automatica li propone tutti a turno in base a quanto ciascuno e "in ritardo".
 
 ## Le tre modalita di sessione
 
 1. **Guidata dal piano** - l'app pesca lo step dovuto e lo prescrive per intero.
 2. **Monostrutturale** - corsa outdoor, bici su strada, nuoto, vogatore o bike indoor: scegli l'attivita, registri distanza e durata reali a fine sessione.
-3. **Manuale** - scegli tu i movimenti (dal database interno) e il formato; l'app struttura la sessione ma non decide i numeri.
+3. **Manuale** - scegli prima il focus di oggi (Solo WOD / Forza / Skill), poi decidi se il WOD lo scrivi tu (movimenti dal database interno) o lo generi l'app - in entrambi i casi il warm-up viene costruito automaticamente sui pattern coinvolti.
 
 ## Cosa tiene traccia di cosa
 

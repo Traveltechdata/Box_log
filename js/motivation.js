@@ -9,7 +9,7 @@ function startOfDay(d) {
 
 function completedDates(sessions) {
   return sessions
-    .filter(s => s.status !== 'planned' && s.completed)
+    .filter(s => s.status !== 'planned' && s.completion > 0)
     .map(s => startOfDay(s.date).getTime())
     .sort((a, b) => b - a);
 }
@@ -41,7 +41,7 @@ export function daysSinceLast(sessions) {
 
 export function sessionsInLastDays(sessions, days) {
   const cutoff = Date.now() - days * DAY_MS;
-  return sessions.filter(s => s.status !== 'planned' && s.completed && new Date(s.date).getTime() >= cutoff).length;
+  return sessions.filter(s => s.status !== 'planned' && s.completion > 0 && new Date(s.date).getTime() >= cutoff).length;
 }
 
 export function motivationalMessage({ streak, gapDays }) {

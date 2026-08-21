@@ -1,4 +1,5 @@
 import { generateWod } from './generator/generateWod.js';
+import { allocateTime } from './generator/scaling.js';
 import { computeReadiness, readinessBand, trainingLoad } from './generator/readiness.js';
 import { MOVEMENTS, getMovement } from './data/movements.js';
 import { warmupDrillsForPatterns, pickGeneralRaise } from './data/warmups.js';
@@ -22,7 +23,7 @@ import { computeStreak, daysSinceLast, motivationalMessage, REMINDER_DAYS, notif
 import { monthLabel, buildMonthGrid, weekdayHeaderHtml, renderMonthGridHtml } from './ui/calendar.js';
 import { trainingLoadChartSvg } from './ui/chart.js';
 
-export const APP_VERSION = 'v5 - 21 ago 2026 (piani)';
+export const APP_VERSION = 'v6 - 21 ago 2026 (sessione completa)';
 
 const TIME_OPTIONS = [30, 45, 60, 75, 90];
 const LEVELS = [
@@ -54,16 +55,12 @@ const EQUIPMENT = [
   { id: 'sled', label: 'Slitta' },
   { id: 'yoke', label: 'Yoke' },
   { id: 'sandbag', label: 'Sandbag' },
+  { id: 'battle_ropes', label: 'Battle ropes' },
 ];
-const LIMITATION_MOVEMENTS = [
-  { id: 'box_jump', label: 'Box jump' },
-  { id: 'burpee', label: 'Burpee (con salto)' },
-  { id: 'double_under', label: 'Double-under' },
-  { id: 'run', label: 'Corsa' },
-  { id: 'pull_up', label: 'Pull-up strict' },
-  { id: 'deadlift', label: 'Deadlift' },
-  { id: 'back_squat', label: 'Back squat' },
-];
+const LIMITATION_MOVEMENTS = MOVEMENTS
+  .filter(m => !m.recoveryOnly)
+  .map(m => ({ id: m.id, label: m.name }))
+  .sort((a, b) => a.label.localeCompare(b.label));
 const ONE_RM_MOVEMENTS = [
   { id: 'back_squat', label: 'Back squat' },
   { id: 'front_squat', label: 'Front squat' },
@@ -110,6 +107,7 @@ let state = {
   session: null,
   newPlanKind: 'strength',
   completionSel: 100,
+  timerHandle: null,
 };
 
 const $ = sel => document.querySelector(sel);
@@ -181,6 +179,7 @@ function showPresessionState() {
   $('#checkin-wrap').style.display = 'none';
   $('#session-wrap').style.display = 'none';
   $('#endsession-wrap').style.display = 'none';
+  stopSessionTimer();
   renderDuePlanCard();
 }
 function showCheckinState() {
@@ -188,6 +187,7 @@ function showCheckinState() {
   $('#checkin-wrap').style.display = 'block';
   $('#session-wrap').style.display = 'none';
   $('#endsession-wrap').style.display = 'none';
+  stopSessionTimer();
   bindTimeChips();
   updateReadinessPreview();
 }
@@ -196,15 +196,43 @@ function showSessionState() {
   $('#checkin-wrap').style.display = 'none';
   $('#session-wrap').style.display = 'block';
   $('#endsession-wrap').style.display = 'none';
+  startSessionTimer();
 }
 function showEndSessionState() {
   $('#presession-wrap').style.display = 'none';
   $('#checkin-wrap').style.display = 'none';
   $('#session-wrap').style.display = 'none';
   $('#endsession-wrap').style.display = 'block';
+  stopSessionTimer();
   bindCompletionChips();
   renderEndSessionExtra();
 }
+
+function startSessionTimer() {
+  clearInterval(state.timerHandle);
+  const update = () => {
+    if (!state.session) return;
+    const elapsed = Date.now() - new Date(state.session.startedAt).getTime();
+    const mm = Math.floor(elapsed / 60000);
+    const ss = Math.floor((elapsed % 60000) / 1000);
+    const el = $('#session-timer');
+    if (el) el.textContent = `${mm}:${String(ss).padStart(2, '0')}`;
+  };
+  update();
+  state.timerHandle = setInterval(update, 1000);
+}
+function stopSessionTimer() {
+  clearInterval(state.timerHandle);
+}
+
+$('#btn-cancel-session').addEventListener('click', () => {
+  if (!confirm('Annullare questa sessione? Non verrà salvata nello storico.')) return;
+  stopSessionTimer();
+  clearActiveSession();
+  state.session = null;
+  toast('Sessione annullata');
+  showPresessionState();
+});
 
 function renderDuePlanCard() {
   const plans = getPlans().filter(p => p.status === 'active');
@@ -218,7 +246,12 @@ function renderDuePlanCard() {
   $('#btn-start-guided').disabled = false;
   $('#btn-start-guided').style.opacity = '1';
   const due = pickDuePlan(plans, getSessions());
-  wrap.innerHTML = planSummaryHtml(due);
+  const others = plans.filter(p => p.id !== due.id);
+  let html = planSummaryHtml(due);
+  if (others.length > 0) {
+    html += `<p class="small muted" style="margin-top:8px;">In rotazione anche: ${others.map(p => p.label).join(', ')}</p>`;
+  }
+  wrap.innerHTML = html;
 }
 
 function planSummaryHtml(plan) {
@@ -357,7 +390,19 @@ function buildSessionContentData(session) {
   }
 
   if (session.kind === 'manual') {
-    session.content = { type: 'manual', rows: [], formatLabel: '', notes: '' };
+    session.content = {
+      type: 'manual',
+      focusType: 'solo_wod',
+      focusMovementId: null,
+      focusPrescription: '',
+      focusSkillId: null,
+      focusStepIndex: 0,
+      wodMode: 'write',
+      rows: [],
+      formatLabel: '',
+      notes: '',
+      generatedWod: null,
+    };
     return;
   }
 
@@ -367,8 +412,10 @@ function buildSessionContentData(session) {
   if (plan.kind === 'strength') {
     const movement = getMovement(plan.movementId);
     const rx = strengthSessionPrescription(plan);
+    const split = splitSessionMinutes(session.availableMinutes, true);
     const warmup = buildWarmupFor(movement.patterns, profile.equipment);
-    session.content = { type: 'strength', planId: plan.id, movement: movement.name, rx, warmup };
+    const wod = buildFocusAvoidingWod(split.wod, movement.patterns, session, profile);
+    session.content = { type: 'strength', planId: plan.id, movement: movement.name, rx, warmup, wod, centralMinutes: split.central };
     session.draft.strengthCompleted = true;
     return;
   }
@@ -376,8 +423,10 @@ function buildSessionContentData(session) {
   if (plan.kind === 'skill') {
     const { skill, step, isFinalStep } = skillSessionPrescription(plan);
     const patterns = SKILL_PATTERNS[plan.skillId] || [];
+    const split = splitSessionMinutes(session.availableMinutes, true);
     const warmup = buildWarmupFor(patterns, profile.equipment);
-    session.content = { type: 'skill', planId: plan.id, skillLabel: skill.label, step, stepIndex: plan.stepIndex, totalSteps: skill.steps.length, isFinalStep, warmup };
+    const wod = buildFocusAvoidingWod(split.wod, patterns, session, profile);
+    session.content = { type: 'skill', planId: plan.id, skillLabel: skill.label, step, stepIndex: plan.stepIndex, totalSteps: skill.steps.length, isFinalStep, warmup, wod, centralMinutes: split.central };
     session.draft.skillClean = true;
     return;
   }
@@ -414,6 +463,37 @@ function buildWarmupFor(patterns, equipment) {
   return { raise, drills };
 }
 
+// Splits the session into warmup / central (strength or skill) / wod / cooldown.
+// hasCentral=false (e.g. a pure-conditioning day) gives the whole middle block to the WOD.
+function splitSessionMinutes(availableMinutes, hasCentral) {
+  const time = allocateTime(availableMinutes);
+  if (!hasCentral) return { warmup: time.warmup, central: 0, wod: time.main, cooldown: time.cooldown };
+  const central = Math.max(10, Math.min(time.main - 6, Math.round(time.main * 0.45)));
+  const wod = Math.max(6, time.main - central);
+  return { warmup: time.warmup, central, wod, cooldown: time.cooldown };
+}
+
+// Builds the closing WOD for a Strength/Skill-focused session. It softly avoids
+// the pattern(s) just trained (passed in as extra "recent" patterns so the
+// engine's own variety scoring naturally steers away from them) rather than a
+// hard ban — a real coach would still allow it occasionally if nothing else fits.
+function buildFocusAvoidingWod(wodMinutes, avoidPatterns, session, profile) {
+  return generateWod({
+    goal: 'conditioning',
+    availableMinutes: wodMinutes,
+    level: profile.level,
+    equipment: profile.equipment,
+    limitations: profile.limitations,
+    recentPatterns: recentPatterns(2),
+    recentTemplateIds: recentTemplateIds(3),
+    readinessScore: session.readinessScore,
+    band: readinessBand(session.readinessScore),
+    oneRMs: profile.oneRMs || {},
+    gender: profile.gender || null,
+    avoidPatterns,
+  });
+}
+
 function getPlan(id) {
   return getPlans().find(p => p.id === id) || null;
 }
@@ -439,7 +519,7 @@ function renderActiveSessionContent() {
       </div>
       <span class="field-label">Hai completato tutte le serie previste?</span>
       <div class="chip-group" id="strength-result-chips"></div>
-    `;
+    ` + renderWodMainOnly(content.wod);
     bindBoolChips('#strength-result-chips', 'strengthCompleted', true);
   } else if (content.type === 'skill') {
     el.innerHTML = warmupHtml(content.warmup) + `
@@ -450,7 +530,7 @@ function renderActiveSessionContent() {
       </div>
       <span class="field-label">Eseguito pulito?</span>
       <div class="chip-group" id="skill-result-chips"></div>
-    `;
+    ` + renderWodMainOnly(content.wod);
     bindBoolChips('#skill-result-chips', 'skillClean', true);
   } else if (content.type === 'metcon_retest') {
     el.innerHTML = `
@@ -510,10 +590,12 @@ function renderWodBlock(key, label, minutes, content) {
   return `<div class="wod-block"><div class="wod-block-label"><span class="swatch" style="background:${WOD_BLOCK_COLORS[key]}"></span><span class="txt">${label}</span>${minutes != null ? `<span class="mins">${minutes} min</span>` : ''}</div>${content}</div>`;
 }
 function renderWodBlocksHtml(wod) {
-  let html = warmupHtml(wod.warmup);
+  return warmupHtml(wod.warmup) + renderWodMainOnly(wod);
+}
+function renderWodMainOnly(wod) {
   const moveItems = wod.main.movements.map(m =>
     `<li><span>${m.name}${m.loadText ? ` <span class="muted small">(${m.loadText})</span>` : ''}</span><span class="reps">${m.repsText}</span></li>`).join('');
-  html += renderWodBlock('main', FORMAT_LABELS[wod.format] || 'WOD', wod.main.estimatedMinutes, `
+  let html = renderWodBlock('main', FORMAT_LABELS[wod.format] || 'WOD', wod.main.estimatedMinutes, `
     <div class="wod-structure">${wod.main.structureText}</div>
     ${wod.main.scoreType ? `<div class="wod-score-type">Punteggio: ${wod.main.scoreType}</div>` : ''}
     <ul class="wod-move-list">${moveItems}</ul>
@@ -533,47 +615,155 @@ function bindBoolChips(selector, draftKey, defaultVal) {
   bind();
 }
 
+function manualFocusPatterns(content) {
+  if (content.focusType === 'strength' && content.focusMovementId) {
+    return (getMovement(content.focusMovementId) || {}).patterns || [];
+  }
+  if (content.focusType === 'skill' && content.focusSkillId) {
+    return SKILL_PATTERNS[content.focusSkillId] || [];
+  }
+  return [];
+}
+function manualWodPatterns(content) {
+  if (content.generatedWod) return content.generatedWod.patternsHit || [];
+  if (content.wodMode === 'write') {
+    return content.rows.flatMap(r => (getMovement(r.movementId) || {}).patterns || []);
+  }
+  return [];
+}
+
 function renderManualBuilder() {
   const session = state.session;
-  const rows = session.content.rows;
+  const content = session.content;
+  const profile = state.profile || defaultProfile();
   const el = $('#session-content');
-  const movementOptions = MOVEMENTS.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
-  el.innerHTML = `
-    <span class="field-label">Formato (facoltativo)</span>
-    <input type="text" id="manual-format" placeholder="es. AMRAP 15, For Time, 5x5..." value="${session.content.formatLabel || ''}" />
-    <span class="field-label">Movimenti</span>
-    <div id="manual-rows"></div>
-    <button type="button" class="btn btn-secondary" id="btn-manual-add-row" style="margin-top:8px;">+ Aggiungi movimento</button>
-    <span class="field-label">Note</span>
-    <textarea id="manual-notes" placeholder="Note libere...">${session.content.notes || ''}</textarea>
-  `;
-  $('#manual-format').addEventListener('input', (e) => { session.content.formatLabel = e.target.value; persistSession(); });
-  $('#manual-notes').addEventListener('input', (e) => { session.content.notes = e.target.value; persistSession(); });
 
-  function renderRows() {
-    const rowsEl = $('#manual-rows');
-    rowsEl.innerHTML = rows.map((row, i) => `
-      <div class="manual-row" data-i="${i}">
-        <select class="manual-row-movement">${movementOptions}</select>
-        <input type="text" class="manual-row-reps" placeholder="reps/note" value="${row.reps || ''}" />
-        <button type="button" class="btn-ghost manual-row-remove">x</button>
-      </div>
-    `).join('');
-    rowsEl.querySelectorAll('.manual-row').forEach((rowEl) => {
-      const i = Number(rowEl.dataset.i);
-      const sel = rowEl.querySelector('.manual-row-movement');
-      sel.value = rows[i].movementId || MOVEMENTS[0].id;
-      sel.addEventListener('change', (e) => { rows[i].movementId = e.target.value; persistSession(); });
-      rowEl.querySelector('.manual-row-reps').addEventListener('input', (e) => { rows[i].reps = e.target.value; persistSession(); });
-      rowEl.querySelector('.manual-row-remove').addEventListener('click', () => { rows.splice(i, 1); persistSession(); renderRows(); });
+  const focusPatterns = manualFocusPatterns(content);
+  const wodPatterns = manualWodPatterns(content);
+  const warmupPatterns = focusPatterns.length ? focusPatterns : wodPatterns;
+  const warmup = buildWarmupFor(warmupPatterns, profile.equipment);
+
+  let html = warmupHtml(warmup);
+  html += '<span class="field-label">Focus di oggi</span><div class="chip-group" id="manual-focus-chips"></div>';
+
+  if (content.focusType === 'strength') {
+    html += `
+      <span class="field-label">Movimento</span>
+      <select id="manual-focus-movement" class="select-input">${ONE_RM_MOVEMENTS.map(m => `<option value="${m.id}">${m.label}</option>`).join('')}</select>
+      <span class="field-label">Prescrizione (serie x reps @ carico)</span>
+      <input type="text" id="manual-focus-prescription" placeholder="es. 5x5 @ 90kg" value="${content.focusPrescription || ''}" />
+    `;
+  } else if (content.focusType === 'skill') {
+    html += `
+      <span class="field-label">Skill</span>
+      <select id="manual-focus-skill" class="select-input">${SKILLS.map(s => `<option value="${s.id}">${s.label}</option>`).join('')}</select>
+      <span class="field-label">Step</span>
+      <select id="manual-focus-step" class="select-input"></select>
+    `;
+  }
+
+  html += '<hr class="chalk-rule" /><span class="field-label">WOD</span><div class="chip-group" id="manual-wodmode-chips"></div><div id="manual-wod-area"></div>';
+  html += `<span class="field-label">Note</span><textarea id="manual-notes" placeholder="Note libere...">${content.notes || ''}</textarea>`;
+
+  el.innerHTML = html;
+
+  const focusOptions = [{ id: 'solo_wod', label: 'Solo WOD' }, { id: 'strength', label: 'Forza' }, { id: 'skill', label: 'Skill' }];
+  renderChipGroup($('#manual-focus-chips'), focusOptions, content.focusType, (id) => {
+    content.focusType = id;
+    content.generatedWod = null;
+    persistSession();
+    renderManualBuilder();
+  });
+
+  if (content.focusType === 'strength') {
+    if (!content.focusMovementId) { content.focusMovementId = ONE_RM_MOVEMENTS[0].id; persistSession(); }
+    $('#manual-focus-movement').value = content.focusMovementId;
+    $('#manual-focus-movement').addEventListener('change', (e) => { content.focusMovementId = e.target.value; content.generatedWod = null; persistSession(); renderManualBuilder(); });
+    $('#manual-focus-prescription').addEventListener('input', (e) => { content.focusPrescription = e.target.value; persistSession(); });
+  } else if (content.focusType === 'skill') {
+    if (!content.focusSkillId) { content.focusSkillId = SKILLS[0].id; persistSession(); }
+    $('#manual-focus-skill').value = content.focusSkillId;
+    const fillSteps = () => {
+      const skill = getSkill($('#manual-focus-skill').value);
+      $('#manual-focus-step').innerHTML = skill.steps.map((s, i) => `<option value="${i}">${i + 1}. ${s.label}</option>`).join('');
+      $('#manual-focus-step').value = content.focusStepIndex || 0;
+    };
+    fillSteps();
+    $('#manual-focus-skill').addEventListener('change', (e) => { content.focusSkillId = e.target.value; content.focusStepIndex = 0; content.generatedWod = null; persistSession(); fillSteps(); renderManualBuilder(); });
+    $('#manual-focus-step').addEventListener('change', (e) => { content.focusStepIndex = Number(e.target.value); persistSession(); });
+  }
+
+  const wodModeOptions = [{ id: 'generate', label: 'Genera tu' }, { id: 'write', label: 'Lo scrivo io' }];
+  renderChipGroup($('#manual-wodmode-chips'), wodModeOptions, content.wodMode, (id) => {
+    content.wodMode = id;
+    content.generatedWod = null;
+    persistSession();
+    renderManualBuilder();
+  });
+
+  renderManualWodArea();
+  $('#manual-notes').addEventListener('input', (e) => { content.notes = e.target.value; persistSession(); });
+}
+
+function renderManualWodArea() {
+  const content = state.session.content;
+  const areaEl = $('#manual-wod-area');
+  if (content.wodMode === 'generate') {
+    if (content.generatedWod) {
+      areaEl.innerHTML = renderWodMainOnly(content.generatedWod) + '<button type="button" class="btn btn-secondary" id="btn-manual-regen" style="margin-top:8px;">Rigenera WOD</button>';
+      $('#btn-manual-regen').addEventListener('click', generateManualWod);
+    } else {
+      areaEl.innerHTML = '<button type="button" class="btn btn-primary" id="btn-manual-gen">Genera WOD</button>';
+      $('#btn-manual-gen').addEventListener('click', generateManualWod);
+    }
+  } else {
+    areaEl.innerHTML = `
+      <input type="text" id="manual-format" placeholder="es. AMRAP 15, For Time, 5x5..." value="${content.formatLabel || ''}" />
+      <div id="manual-rows"></div>
+      <button type="button" class="btn btn-secondary" id="btn-manual-add-row" style="margin-top:8px;">+ Aggiungi movimento</button>
+    `;
+    $('#manual-format').addEventListener('input', (e) => { content.formatLabel = e.target.value; persistSession(); });
+    renderManualRows();
+    $('#btn-manual-add-row').addEventListener('click', () => {
+      content.rows.push({ movementId: MOVEMENTS[0].id, reps: '' });
+      persistSession();
+      renderManualRows();
     });
   }
-  renderRows();
-  $('#btn-manual-add-row').addEventListener('click', () => {
-    rows.push({ movementId: MOVEMENTS[0].id, reps: '' });
-    persistSession();
-    renderRows();
+}
+
+function renderManualRows() {
+  const content = state.session.content;
+  const rows = content.rows;
+  const movementOptions = MOVEMENTS.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+  const rowsEl = $('#manual-rows');
+  rowsEl.innerHTML = rows.map((row, i) => `
+    <div class="manual-row" data-i="${i}">
+      <select class="manual-row-movement">${movementOptions}</select>
+      <input type="text" class="manual-row-reps" placeholder="reps/note" value="${row.reps || ''}" />
+      <button type="button" class="btn-ghost manual-row-remove">x</button>
+    </div>
+  `).join('');
+  rowsEl.querySelectorAll('.manual-row').forEach((rowEl) => {
+    const i = Number(rowEl.dataset.i);
+    const sel = rowEl.querySelector('.manual-row-movement');
+    sel.value = rows[i].movementId || MOVEMENTS[0].id;
+    sel.addEventListener('change', (e) => { rows[i].movementId = e.target.value; persistSession(); });
+    rowEl.querySelector('.manual-row-reps').addEventListener('input', (e) => { rows[i].reps = e.target.value; persistSession(); });
+    rowEl.querySelector('.manual-row-remove').addEventListener('click', () => { rows.splice(i, 1); persistSession(); renderManualRows(); });
   });
+}
+
+function generateManualWod() {
+  const session = state.session;
+  const content = session.content;
+  const profile = state.profile || defaultProfile();
+  const focusPatterns = manualFocusPatterns(content);
+  const hasCentral = content.focusType !== 'solo_wod';
+  const split = splitSessionMinutes(session.availableMinutes, hasCentral);
+  content.generatedWod = buildFocusAvoidingWod(split.wod, focusPatterns, session, profile);
+  persistSession();
+  renderManualBuilder();
 }
 
 function persistSession() {
@@ -619,7 +809,7 @@ $('#btn-endsession-save').addEventListener('click', () => {
     if (plan) {
       const updated = applyStrengthResult(plan, { completedAllSets: !!session.draft.strengthCompleted });
       updatePlan(plan.id, updated);
-      patternsHit = (getMovement(plan.movementId) || {}).patterns || [];
+      patternsHit = ((getMovement(plan.movementId) || {}).patterns || []).concat(content.wod.patternsHit || []);
     }
     extraFields.planId = content.planId;
   } else if (content && content.type === 'skill' && completion > 0) {
@@ -631,6 +821,7 @@ $('#btn-endsession-save').addEventListener('click', () => {
         toast(`Skill completata: ${content.skillLabel}!`);
       }
     }
+    patternsHit = content.wod.patternsHit || [];
     extraFields.planId = content.planId;
   } else if (content && content.type === 'metcon_retest') {
     const plan = getPlan(content.planId);
@@ -658,9 +849,15 @@ $('#btn-endsession-save').addEventListener('click', () => {
     extraFields.durationMin = Number(session.draft.durationMin) || session.availableMinutes;
     title = (MONO_ACTIVITIES.find(a => a.id === session.draft.activity) || {}).label || 'Monostrutturale';
   } else if (content && content.type === 'manual') {
+    extraFields.focusType = content.focusType;
+    extraFields.focusMovementId = content.focusMovementId;
+    extraFields.focusPrescription = content.focusPrescription;
+    extraFields.focusSkillId = content.focusSkillId;
+    extraFields.wodMode = content.wodMode;
     extraFields.manualRows = content.rows;
     extraFields.formatLabel = content.formatLabel;
     extraFields.notes = content.notes;
+    patternsHit = manualFocusPatterns(content).concat(manualWodPatterns(content));
   }
 
   const minutes = session.availableMinutes;

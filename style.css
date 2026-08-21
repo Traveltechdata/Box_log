@@ -388,6 +388,16 @@ textarea { min-height: 60px; resize: vertical; }
   margin-bottom: 8px;
 }
 
+.session-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.session-timer {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--marker-yellow);
+  font-variant-numeric: tabular-nums;
+}
+#btn-cancel-session { margin-top: 10px; padding: 4px; color: var(--chalk-dim); }
+
 /* ---------- plan cards ---------- */
 .plan-item { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 12px; }
 .plan-item .row1 { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }

@@ -40,7 +40,9 @@ export function weekdayHeaderHtml() {
 
 function dotColorFor(session) {
   if (session.status === 'planned') return 'var(--marker-yellow)';
-  if (session.completed) return 'var(--marker-teal)';
+  if (session.completion === 100) return 'var(--marker-teal)';
+  if (session.completion === 50) return 'var(--marker-yellow)';
+  if (session.completion === 0) return 'var(--marker-red)';
   return 'var(--marker-red)';
 }
 
