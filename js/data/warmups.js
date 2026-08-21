@@ -67,7 +67,7 @@ export function warmupDrillsForPatterns(patterns) {
     const need = 2 - drills.length;
     drills = drills.concat(GENERIC_TOPUP.slice(0, need));
   }
-  return drills;
+  return drills.slice(0, 4);
 }
 
 export function pickGeneralRaise(equipment) {

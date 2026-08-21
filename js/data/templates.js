@@ -150,8 +150,8 @@ export const TEMPLATES = [
     label: 'AMRAP reps (singolo movimento)',
     goals: ['conditioning', 'general'],
     format: 'AMRAP_REPS',
-    time_domain: [2, 6],
-    duration: 4,
+    time_domain: [8, 12],
+    duration: 10,
     movement_slots: [
       { pattern: 'squat', modality: 'weightlifting' },
     ],
@@ -164,8 +164,8 @@ export const TEMPLATES = [
     label: 'AMRAP reps (cardio)',
     goals: ['conditioning', 'aerobic'],
     format: 'AMRAP_REPS',
-    time_domain: [3, 8],
-    duration: 5,
+    time_domain: [8, 12],
+    duration: 10,
     movement_slots: [
       { pattern: 'cyclical', modality: 'monostructural' },
     ],
@@ -208,25 +208,11 @@ export const TEMPLATES = [
 
   // ---------------- TABATA ----------------
   {
-    id: 'tabata_single',
-    label: 'Tabata (un movimento)',
-    goals: ['conditioning', 'general'],
-    format: 'TABATA',
-    time_domain: [4, 10],
-    duration: 4,
-    movement_slots: [
-      { pattern: 'squat', modality: 'bodyweight' },
-    ],
-    repScheme: {},
-    target_rpe: [8, 9],
-    stimulus: '8 round da 20" massimali e 10" di riposo sullo stesso movimento, punteggio sul round peggiore',
-  },
-  {
     id: 'tabata_pair',
-    label: 'Tabata (due movimenti alternati)',
+    label: 'Tabata (due blocchi)',
     goals: ['conditioning', 'general'],
     format: 'TABATA',
-    time_domain: [6, 12],
+    time_domain: [8, 8],
     duration: 8,
     movement_slots: [
       { pattern: 'squat', modality: 'bodyweight' },
@@ -234,7 +220,7 @@ export const TEMPLATES = [
     ],
     repScheme: {},
     target_rpe: [8, 9],
-    stimulus: '8 round totali, i due movimenti si alternano ogni round (4 round ciascuno)',
+    stimulus: '8 round da 20"/10" sul primo movimento, poi 8 round da 20"/10" sul secondo \u2014 8 minuti totali, nessun tempo morto',
   },
 
   // ---------------- DEATH BY ----------------

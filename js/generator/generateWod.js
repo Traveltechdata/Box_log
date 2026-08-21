@@ -12,6 +12,11 @@ const SEC_PER_REP = {
   core: 2.5, jump: 2, lunge: 3, carry: 8, cyclical: 1, mobility: 1,
 };
 
+// No WOD is ever shorter than 8' (not intense enough to mean anything) or
+// longer than 25' (loses focus as a single WOD) — applies to every format.
+export const WOD_MIN_MINUTES = 8;
+export const WOD_MAX_MINUTES = 25;
+
 const STRENGTH_SCHEMES = {
   high: { sets: 5, reps: 3, pct: 0.85 },
   normal: { sets: 5, reps: 5, pct: 0.75 },
@@ -25,9 +30,16 @@ function secPerRep(movement) {
 // Time-capped formats (AMRAP/EMOM/Tabata/Death By/Steady) should fill the time
 // the athlete actually has, not just default to the template's baseline duration.
 function fitDurationMinutes(template, context) {
-  const time = allocateTime(context.availableMinutes);
-  const target = Math.max(template.time_domain[0], context.availableMinutes - time.warmup - time.cooldown);
-  return Math.max(template.time_domain[0], Math.min(template.time_domain[1], Math.round(target)));
+  let target;
+  if (context.noOverhead) {
+    target = context.availableMinutes;
+  } else {
+    const time = allocateTime(context.availableMinutes);
+    target = Math.max(template.time_domain[0], context.availableMinutes - time.warmup - time.cooldown);
+  }
+  const lo = Math.max(template.time_domain[0], WOD_MIN_MINUTES);
+  const hi = Math.min(template.time_domain[1], WOD_MAX_MINUTES);
+  return Math.max(lo, Math.min(hi, Math.round(target)));
 }
 
 function loadTextFor(movement, loadMult, gender) {
@@ -42,6 +54,17 @@ function loadTextFor(movement, loadMult, gender) {
 function pickMetconMovement(slot, context, usedIds) {
   const picked = pickMovement(slot, context, usedIds);
   return picked; // { movement, chain }
+}
+
+// When the athlete picked their own movements (assisted "Genera tu" flow),
+// use those directly in order instead of the algorithmic search/scoring pick.
+function pickForSlot(slot, context, usedIds) {
+  if (context.explicitMovements) {
+    const next = context.explicitMovements.find(m => !usedIds.has(m.id));
+    if (!next) return null;
+    return { movement: next, chain: [next.id] };
+  }
+  return pickMetconMovement(slot, context, usedIds);
 }
 
 // For continuous/steady-state work, prefer machines actually suited to sustained
@@ -198,24 +221,45 @@ function buildForTime(template, context) {
   const scalingInfo = readinessScaling(context.readinessBand);
 
   for (const slot of template.movement_slots) {
-    const picked = pickMetconMovement(slot, context, usedIds);
+    const picked = pickForSlot(slot, context, usedIds);
     if (!picked) return null;
     usedIds.add(picked.movement.id);
     movements.push({ movement: picked.movement, chain: picked.chain });
   }
 
   const scheme = template.repScheme;
-  let structureText, perMovementReps;
+  let perMovementReps;
+  let ladderRungs = null;
+  const baseReps = Math.max(4, Math.round((scheme.reps || 12) * scalingInfo.volumeMult));
+
   if (scheme.type === 'ladder') {
-    const scaled = scheme.reps.map(r => Math.max(3, Math.round(r * scalingInfo.volumeMult)));
-    structureText = scaled.join('-');
-    perMovementReps = scaled.reduce((a, b) => a + b, 0);
+    ladderRungs = scheme.reps.map(r => Math.max(3, Math.round(r * scalingInfo.volumeMult)));
+    perMovementReps = ladderRungs.reduce((a, b) => a + b, 0);
   } else {
     const rounds = Math.max(2, Math.round(scheme.rounds * scalingInfo.volumeMult));
-    const reps = Math.max(4, Math.round(scheme.reps * scalingInfo.volumeMult));
-    structureText = `${rounds} round \u2014 ${reps} reps a movimento`;
-    perMovementReps = rounds * reps;
+    perMovementReps = rounds * baseReps;
   }
+
+  const secPerMovementRep = () => movements.reduce((acc, { movement }) => acc + secPerRep(movement), 0);
+  let totalSeconds = secPerMovementRep() * perMovementReps;
+  const minSec = WOD_MIN_MINUTES * 60, maxSec = WOD_MAX_MINUTES * 60;
+
+  // Always land inside the global [8,25] min window by scaling volume, not
+  // just estimating whatever the base scheme happens to produce.
+  if (totalSeconds < minSec || totalSeconds > maxSec) {
+    const factor = totalSeconds < minSec ? minSec / totalSeconds : maxSec / totalSeconds;
+    if (ladderRungs) {
+      ladderRungs = ladderRungs.map(r => Math.max(3, Math.round(r * factor)));
+      perMovementReps = ladderRungs.reduce((a, b) => a + b, 0);
+    } else {
+      perMovementReps = Math.max(8, Math.round(perMovementReps * factor));
+    }
+    totalSeconds = secPerMovementRep() * perMovementReps;
+  }
+
+  const structureText = ladderRungs
+    ? ladderRungs.join('-')
+    : `${Math.max(2, Math.round(perMovementReps / baseReps))} round \u2014 ${baseReps} reps a movimento`;
 
   const displayMovements = movements.map(({ movement }) => ({
     name: movement.name,
@@ -223,12 +267,11 @@ function buildForTime(template, context) {
     loadText: loadTextFor(movement, scalingInfo.loadMult, context.gender),
   }));
 
-  const totalSeconds = movements.reduce((acc, { movement }) => acc + secPerRep(movement) * perMovementReps, 0);
-  const estimatedMinutes = Math.max(4, Math.round(totalSeconds / 60));
+  const estimatedMinutes = Math.max(WOD_MIN_MINUTES, Math.min(WOD_MAX_MINUTES, Math.round(totalSeconds / 60)));
 
   return {
     mainMovements: movements,
-    estimatedMinutes: Math.min(estimatedMinutes, Math.round(template.duration * 1.6)),
+    estimatedMinutes,
     goalMatch: template.goals.includes(context.goal),
     structureText: `For Time \u2014 ${structureText}`,
     scoreType: 'Tempo totale per completare',
@@ -246,7 +289,7 @@ function buildAmrapRounds(template, context) {
   const baseReps = template.repScheme.reps;
 
   for (const slot of template.movement_slots) {
-    const picked = pickMetconMovement(slot, context, usedIds);
+    const picked = pickForSlot(slot, context, usedIds);
     if (!picked) return null;
     usedIds.add(picked.movement.id);
     movements.push({ movement: picked.movement, chain: picked.chain });
@@ -276,7 +319,7 @@ function buildAmrapReps(template, context) {
   const usedIds = new Set();
   const slot = template.movement_slots[0];
   const requireCalorieCapable = template.repScheme.unitOverride === 'cal';
-  let picked = pickMetconMovement(slot, context, usedIds);
+  let picked = pickForSlot(slot, context, usedIds);
 
   if (requireCalorieCapable && (!picked || !picked.movement.calorieCapable)) {
     const calorieOnly = MOVEMENTS.filter(m => m.calorieCapable && m.equipment.every(e => context.equipment.includes(e)));
@@ -310,7 +353,7 @@ function buildEmom(template, context) {
   const scalingInfo = readinessScaling(context.readinessBand);
 
   for (const slot of template.movement_slots) {
-    const picked = pickMetconMovement(slot, context, usedIds);
+    const picked = pickForSlot(slot, context, usedIds);
     if (!picked) return null;
     usedIds.add(picked.movement.id);
     movements.push({ movement: picked.movement, chain: picked.chain });
@@ -348,29 +391,30 @@ function buildTabata(template, context) {
   const scalingInfo = readinessScaling(context.readinessBand);
 
   for (const slot of template.movement_slots) {
-    const picked = pickMetconMovement(slot, context, usedIds);
+    const picked = pickForSlot(slot, context, usedIds);
     if (!picked) return null;
     usedIds.add(picked.movement.id);
     movements.push({ movement: picked.movement, chain: picked.chain });
   }
 
-  const roundsEach = movements.length > 1 ? 4 : 8;
+  // Each movement gets its own full 8-round Tabata block back-to-back
+  // (8 rounds x 20"/10" = 4 min per movement) so a 2-movement WOD totals 8 minutes.
   const displayMovements = movements.map(({ movement }) => ({
     name: movement.name,
-    repsText: `${roundsEach} round`,
+    repsText: '8 round',
     loadText: loadTextFor(movement, scalingInfo.loadMult, context.gender),
   }));
 
   const structureText = movements.length > 1
-    ? `Tabata \u2014 8 round da 20"/10" totali, alternando i due movimenti (${roundsEach} round ciascuno)`
-    : `Tabata \u2014 8 round da 20"/10" sullo stesso movimento`;
+    ? 'Tabata \u2014 8 round da 20"/10" sul primo movimento, poi 8 round da 20"/10" sul secondo (8 minuti totali)'
+    : 'Tabata \u2014 8 round da 20"/10" sullo stesso movimento (4 minuti)';
 
   return {
     mainMovements: movements,
-    estimatedMinutes: 4,
+    estimatedMinutes: movements.length * 4,
     goalMatch: template.goals.includes(context.goal),
     structureText,
-    scoreType: 'Reps nel round peggiore (il più basso)',
+    scoreType: 'Reps nel round peggiore di ogni blocco (il più basso)',
     displayMovements,
     targetRpe: template.target_rpe,
     capRpe: scalingInfo.capRPE,
@@ -381,7 +425,7 @@ function buildTabata(template, context) {
 function buildDeathBy(template, context) {
   const usedIds = new Set();
   const slot = template.movement_slots[0];
-  const picked = pickMetconMovement(slot, context, usedIds);
+  const picked = pickForSlot(slot, context, usedIds);
   if (!picked) return null;
   const scalingInfo = readinessScaling(context.readinessBand);
   const durationMinutes = fitDurationMinutes(template, context);
@@ -403,7 +447,7 @@ function buildSteadyOrRecovery(template, context) {
   const usedIds = new Set();
   const movements = [];
   for (const slot of template.movement_slots) {
-    let picked = pickMetconMovement(slot, context, usedIds);
+    let picked = pickForSlot(slot, context, usedIds);
     if (!picked) return null;
     if (template.format === 'STEADY' && slot.pattern === 'cyclical') {
       picked = preferSustainedCardio(picked, context);
@@ -474,7 +518,7 @@ export function generateWod(input) {
   const {
     goal, availableMinutes, level, equipment, limitations,
     recentPatterns, forceRecovery, priorityMovementIds, oneRMs, recentTemplateIds, gender,
-    forceFormat, avoidPatterns,
+    forceFormat, avoidPatterns, noOverhead,
   } = input;
 
   const band = input.band || readinessBand(input.readinessScore);
@@ -487,6 +531,7 @@ export function generateWod(input) {
     recentTemplateIds: recentTemplateIds || [],
     gender: gender || null,
     avoidPatterns: avoidPatterns || [],
+    noOverhead: !!noOverhead,
   };
 
   const isRecoveryTemplate = t => t.id === 'recovery_session' || t.id === 'recovery_technical';
@@ -613,5 +658,84 @@ function fallbackSession(context) {
     reasons: ['Nessun template soddisfa i vincoli attuali in sicurezza (es. attrezzatura mancante per l\u2019obiettivo scelto): proposta una sessione di recupero a basso rischio'],
     readiness: { score: undefined, band: context.readinessBand },
     patternsHit: ['cyclical'],
+  };
+}
+
+// ---------------- assisted generation: user picks format + 2-3 movements ----------------
+// The athlete chooses the shape (For Time / AMRAP / EMOM / Total reps) and the
+// movements; the engine fills in every number (reps, rounds, loads) the same
+// way it would for an algorithmic pick, just skipping the movement search.
+const DEFAULT_REP_SCHEME_FOR_FORMAT = {
+  FOR_TIME: { type: 'ladder', reps: [21, 15, 9] },
+  AMRAP_ROUNDS: { reps: 15 },
+  EMOM: { repsPerMinute: 10 },
+  AMRAP_REPS: {},
+};
+
+export function generateWodFromMovements(input) {
+  const {
+    format, movementIds, availableMinutes, level, equipment, limitations,
+    readinessScore, gender, oneRMs,
+  } = input;
+  const band = input.band || readinessBand(readinessScore);
+  const movements = (movementIds || []).map(getMovement).filter(Boolean);
+  if (movements.length === 0) return null;
+
+  const context = {
+    goal: 'conditioning', availableMinutes, level, equipment, limitations,
+    recentPatterns: [], readinessBand: band,
+    priorityMovementIds: [], oneRMs: oneRMs || {}, recentTemplateIds: [],
+    gender: gender || null, avoidPatterns: [],
+    explicitMovements: movements,
+    noOverhead: true,
+  };
+
+  const repScheme = { ...DEFAULT_REP_SCHEME_FOR_FORMAT[format] };
+  if (format === 'AMRAP_REPS' && movements[0].calorieCapable) repScheme.unitOverride = 'cal';
+  if (format === 'EMOM') {
+    const isHeavy = movements.some(m => m.patterns.includes('olympic') || m.isStrengthLift || m.fatigue >= 4);
+    repScheme.repsPerMinute = isHeavy ? 4 : 10;
+  }
+
+  const durationMinutes = Math.max(WOD_MIN_MINUTES, Math.min(WOD_MAX_MINUTES, Math.round(availableMinutes)));
+  const template = {
+    id: 'custom_' + format.toLowerCase(),
+    label: 'WOD personalizzato',
+    format,
+    goals: ['conditioning'],
+    time_domain: [WOD_MIN_MINUTES, WOD_MAX_MINUTES],
+    duration: durationMinutes,
+    movement_slots: movements.map(() => ({ pattern: null, modality: null })),
+    repScheme,
+    target_rpe: [7, 9],
+  };
+
+  const builder = METCON_BUILDERS[format];
+  if (!builder) return null;
+  const built = builder(template, context);
+  if (!built) return null;
+
+  const time = allocateTime(availableMinutes);
+  const warmup = buildWarmup(time.warmup, built.patternsHit, equipment);
+
+  return {
+    templateLabel: 'WOD personalizzato',
+    templateId: template.id,
+    format,
+    stimulus: 'Formato e movimenti scelti da te \u2014 numeri e carichi calcolati dal motore',
+    warmup,
+    primary: null,
+    main: {
+      structureText: built.structureText,
+      scoreType: built.scoreType,
+      movements: built.displayMovements,
+      estimatedMinutes: built.estimatedMinutes,
+      targetRpe: built.targetRpe,
+      capRpe: built.capRpe,
+    },
+    cooldown: { minutes: time.cooldown, text: 'Camminata leggera + stretching mirato sui gruppi muscolari lavorati' },
+    reasons: ['Formato e movimenti selezionati manualmente', `Compatibile con ${availableMinutes} minuti disponibili`],
+    readiness: { score: readinessScore, band },
+    patternsHit: built.patternsHit,
   };
 }

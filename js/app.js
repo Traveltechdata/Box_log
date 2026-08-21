@@ -1,4 +1,4 @@
-import { generateWod } from './generator/generateWod.js';
+import { generateWod, generateWodFromMovements } from './generator/generateWod.js';
 import { allocateTime } from './generator/scaling.js';
 import { computeReadiness, readinessBand, trainingLoad } from './generator/readiness.js';
 import { MOVEMENTS, getMovement } from './data/movements.js';
@@ -23,7 +23,7 @@ import { computeStreak, daysSinceLast, motivationalMessage, REMINDER_DAYS, notif
 import { monthLabel, buildMonthGrid, weekdayHeaderHtml, renderMonthGridHtml } from './ui/calendar.js';
 import { trainingLoadChartSvg } from './ui/chart.js';
 
-export const APP_VERSION = 'v6 - 21 ago 2026 (sessione completa)';
+export const APP_VERSION = 'v7 - 21 ago 2026 (timer a fasi)';
 
 const TIME_OPTIONS = [30, 45, 60, 75, 90];
 const LEVELS = [
@@ -91,6 +91,12 @@ const SKILL_PATTERNS = {
   rope_climb: ['pull'],
 };
 const METCON_WEEK_FORMATS = { 2: 'AMRAP_ROUNDS', 3: 'EMOM', 4: 'FOR_TIME', 5: 'AMRAP_ROUNDS' };
+const ASSISTED_FORMAT_TABS = [
+  { id: 'FOR_TIME', label: 'For Time', minMoves: 2, maxMoves: 3 },
+  { id: 'AMRAP_ROUNDS', label: 'AMRAP', minMoves: 2, maxMoves: 3 },
+  { id: 'EMOM', label: 'EMOM', minMoves: 1, maxMoves: 2 },
+  { id: 'AMRAP_REPS', label: 'Total reps', minMoves: 1, maxMoves: 1 },
+];
 const WOD_BLOCK_COLORS = { warmup: 'var(--marker-teal)', main: 'var(--marker-red)', cooldown: 'var(--marker-teal)' };
 const FORMAT_LABELS = {
   FOR_TIME: 'For Time', AMRAP_ROUNDS: 'AMRAP', AMRAP_REPS: 'AMRAP reps',
@@ -196,7 +202,7 @@ function showSessionState() {
   $('#checkin-wrap').style.display = 'none';
   $('#session-wrap').style.display = 'block';
   $('#endsession-wrap').style.display = 'none';
-  startSessionTimer();
+  renderPhaseUI();
 }
 function showEndSessionState() {
   $('#presession-wrap').style.display = 'none';
@@ -208,18 +214,129 @@ function showEndSessionState() {
   renderEndSessionExtra();
 }
 
-function startSessionTimer() {
+// ---------------- phase timer ----------------
+function getSessionPhases(session) {
+  const content = session.content;
+  if (!content) return [];
+  const warmupMinutes = allocateTime(session.availableMinutes).warmup;
+
+  if (content.type === 'light') {
+    return [{ key: 'light', label: 'Sessione leggera', minutes: session.availableMinutes, countUp: true }];
+  }
+  if (content.type === 'strength' || content.type === 'skill') {
+    const kindLabel = content.type === 'strength' ? 'Forza' : 'Skill';
+    return [
+      { key: 'warmup', label: 'Warm-up', minutes: content.warmup.minutes, countUp: false },
+      { key: 'central', label: kindLabel, minutes: content.centralMinutes, countUp: false },
+      { key: 'wod', label: FORMAT_LABELS[content.wod.format] || 'WOD', minutes: content.wod.main.estimatedMinutes, countUp: content.wod.format === 'FOR_TIME' },
+    ];
+  }
+  if (content.type === 'metcon_week') {
+    return [
+      { key: 'warmup', label: 'Warm-up', minutes: content.wod.warmup.minutes, countUp: false },
+      { key: 'wod', label: FORMAT_LABELS[content.wod.format] || 'WOD', minutes: content.wod.main.estimatedMinutes, countUp: content.wod.format === 'FOR_TIME' },
+    ];
+  }
+  if (content.type === 'metcon_retest') {
+    return [
+      { key: 'warmup', label: 'Warm-up', minutes: (content.warmup && content.warmup.minutes) || warmupMinutes, countUp: false },
+      { key: 'wod', label: 'Retest', minutes: null, countUp: true },
+    ];
+  }
+  if (content.type === 'monostructural') {
+    return [{ key: 'activity', label: 'Attivit\u00e0', minutes: session.availableMinutes, countUp: true }];
+  }
+  if (content.type === 'manual') {
+    const phases = [{ key: 'warmup', label: 'Warm-up', minutes: warmupMinutes, countUp: false }];
+    if (content.focusType !== 'solo_wod') {
+      phases.push({ key: 'central', label: content.focusType === 'strength' ? 'Forza' : 'Skill', minutes: null, countUp: true });
+    }
+    const wod = content.generatedWod;
+    phases.push({ key: 'wod', label: 'WOD', minutes: wod ? wod.main.estimatedMinutes : null, countUp: wod ? wod.format === 'FOR_TIME' : true });
+    return phases;
+  }
+  return [{ key: 'session', label: 'Sessione', minutes: session.availableMinutes, countUp: true }];
+}
+
+function renderPhaseUI() {
+  const session = state.session;
+  if (!session.timerStarted) {
+    $('#phase-start-wrap').style.display = 'flex';
+    $('#phase-timer-wrap').style.display = 'none';
+    $('#session-timer').textContent = '0:00';
+  } else {
+    $('#phase-start-wrap').style.display = 'none';
+    $('#phase-timer-wrap').style.display = 'block';
+    updatePhaseTimerDisplay();
+    startPhaseInterval();
+  }
+}
+
+$('#btn-start-workout').addEventListener('click', () => {
+  const session = state.session;
+  session.timerStarted = true;
+  session.phaseIndex = 0;
+  session.phaseStartedAt = new Date().toISOString();
+  session.overallStartedAt = new Date().toISOString();
+  persistSession();
+  renderPhaseUI();
+});
+
+$('#btn-next-phase').addEventListener('click', () => advancePhase(false));
+
+function advancePhase(auto) {
+  const session = state.session;
+  const phases = getSessionPhases(session);
+  if (session.phaseIndex < phases.length - 1) {
+    session.phaseIndex += 1;
+    session.phaseStartedAt = new Date().toISOString();
+    persistSession();
+    if (auto) toast(`Fase successiva: ${phases[session.phaseIndex].label}`);
+    updatePhaseTimerDisplay();
+  }
+}
+
+function updatePhaseTimerDisplay() {
+  const session = state.session;
+  if (!session || !session.timerStarted) return;
+  const phases = getSessionPhases(session);
+  const phase = phases[session.phaseIndex];
+  if (!phase) return;
+
+  const elapsedSec = Math.floor((Date.now() - new Date(session.phaseStartedAt).getTime()) / 1000);
+  let displaySec, overtime = false;
+  if (phase.countUp || !phase.minutes) {
+    displaySec = elapsedSec;
+  } else {
+    const totalSec = phase.minutes * 60;
+    displaySec = totalSec - elapsedSec;
+    if (displaySec <= 0) { overtime = true; displaySec = Math.abs(displaySec); }
+    if (overtime && session.phaseIndex < phases.length - 1) {
+      advancePhase(true);
+      return;
+    }
+  }
+  const mm = Math.floor(displaySec / 60), ss = displaySec % 60;
+  const valEl = $('#phase-timer-value');
+  if (valEl) {
+    valEl.textContent = `${overtime ? '+' : ''}${mm}:${String(ss).padStart(2, '0')}`;
+    valEl.classList.toggle('overtime', overtime);
+  }
+  const nameEl = $('#phase-name');
+  if (nameEl) nameEl.textContent = phase.label;
+  const progEl = $('#phase-progress');
+  if (progEl) progEl.textContent = `Fase ${session.phaseIndex + 1}/${phases.length}`;
+
+  const overallSec = Math.floor((Date.now() - new Date(session.overallStartedAt || session.startedAt).getTime()) / 1000);
+  const oMm = Math.floor(overallSec / 60), oSs = overallSec % 60;
+  const overallEl = $('#session-timer');
+  if (overallEl) overallEl.textContent = `${oMm}:${String(oSs).padStart(2, '0')}`;
+}
+
+function startPhaseInterval() {
   clearInterval(state.timerHandle);
-  const update = () => {
-    if (!state.session) return;
-    const elapsed = Date.now() - new Date(state.session.startedAt).getTime();
-    const mm = Math.floor(elapsed / 60000);
-    const ss = Math.floor((elapsed % 60000) / 1000);
-    const el = $('#session-timer');
-    if (el) el.textContent = `${mm}:${String(ss).padStart(2, '0')}`;
-  };
-  update();
-  state.timerHandle = setInterval(update, 1000);
+  state.timerHandle = setInterval(updatePhaseTimerDisplay, 1000);
+  updatePhaseTimerDisplay();
 }
 function stopSessionTimer() {
   clearInterval(state.timerHandle);
@@ -366,6 +483,10 @@ $('#btn-checkin-confirm').addEventListener('click', () => {
     readinessBand: band.key,
     forceLightSession,
     draft: {},
+    timerStarted: false,
+    phaseIndex: 0,
+    phaseStartedAt: null,
+    overallStartedAt: null,
   };
 
   buildSessionContentData(session);
@@ -402,6 +523,8 @@ function buildSessionContentData(session) {
       formatLabel: '',
       notes: '',
       generatedWod: null,
+      assistFormat: 'FOR_TIME',
+      assistMovementIds: [],
     };
     return;
   }
@@ -417,6 +540,10 @@ function buildSessionContentData(session) {
     const wod = buildFocusAvoidingWod(split.wod, movement.patterns, session, profile);
     session.content = { type: 'strength', planId: plan.id, movement: movement.name, rx, warmup, wod, centralMinutes: split.central };
     session.draft.strengthCompleted = true;
+    session.draft.weightMode = 'auto';
+    session.draft.customSets = rx.sets;
+    session.draft.customReps = rx.reps;
+    session.draft.customWeight = rx.weightKg ?? null;
     return;
   }
 
@@ -434,7 +561,8 @@ function buildSessionContentData(session) {
   if (plan.kind === 'metcon') {
     const wp = metconWeekPlan(plan);
     if (wp.isRetest) {
-      session.content = { type: 'metcon_retest', planId: plan.id, week: wp.week, benchmarkLabel: plan.benchmarkLabel, benchmarkDescription: plan.benchmarkDescription };
+      const warmup = buildWarmupFor([], profile.equipment);
+      session.content = { type: 'metcon_retest', planId: plan.id, week: wp.week, benchmarkLabel: plan.benchmarkLabel, benchmarkDescription: plan.benchmarkDescription, warmup };
       return;
     }
     const wod = generateWod({
@@ -491,6 +619,7 @@ function buildFocusAvoidingWod(wodMinutes, avoidPatterns, session, profile) {
     oneRMs: profile.oneRMs || {},
     gender: profile.gender || null,
     avoidPatterns,
+    noOverhead: true,
   });
 }
 
@@ -515,12 +644,14 @@ function renderActiveSessionContent() {
       <div class="primary-block strength">
         <div class="primary-kind">Forza</div>
         <div class="primary-movement">${content.movement}</div>
-        <div class="primary-prescription">${content.rx.text}</div>
+        <div class="chip-group" id="strength-mode-chips" style="margin:6px 0 10px;"></div>
+        <div id="strength-prescription-area"></div>
       </div>
       <span class="field-label">Hai completato tutte le serie previste?</span>
       <div class="chip-group" id="strength-result-chips"></div>
     ` + renderWodMainOnly(content.wod);
     bindBoolChips('#strength-result-chips', 'strengthCompleted', true);
+    bindStrengthModeChips();
   } else if (content.type === 'skill') {
     el.innerHTML = warmupHtml(content.warmup) + `
       <div class="primary-block skill">
@@ -533,7 +664,7 @@ function renderActiveSessionContent() {
     ` + renderWodMainOnly(content.wod);
     bindBoolChips('#skill-result-chips', 'skillClean', true);
   } else if (content.type === 'metcon_retest') {
-    el.innerHTML = `
+    el.innerHTML = warmupHtml(content.warmup) + `
       <h3>Retest - settimana ${content.week}</h3>
       <p><strong>${content.benchmarkLabel}</strong></p>
       <p class="small muted">${content.benchmarkDescription || ''}</p>
@@ -603,6 +734,57 @@ function renderWodMainOnly(wod) {
   `);
   html += renderWodBlock('cooldown', 'Cooldown', wod.cooldown.minutes, `<p>${wod.cooldown.text}</p>`);
   return html;
+}
+
+function bindStrengthModeChips() {
+  const session = state.session;
+  const content = session.content;
+  const modeOptions = [{ id: 'auto', label: 'Calcolato' }, { id: 'custom', label: 'Personalizza' }];
+  const bind = () => renderChipGroup($('#strength-mode-chips'), modeOptions, session.draft.weightMode, (id) => {
+    session.draft.weightMode = id;
+    persistSession();
+    bind();
+    renderStrengthPrescriptionArea();
+  });
+  bind();
+  renderStrengthPrescriptionArea();
+}
+
+function renderStrengthPrescriptionArea() {
+  const session = state.session;
+  const content = session.content;
+  const areaEl = $('#strength-prescription-area');
+  if (session.draft.weightMode === 'auto') {
+    areaEl.innerHTML = `
+      <div class="primary-prescription">${content.rx.sets} x ${content.rx.reps} @ ${content.rx.weightKg}kg</div>
+      <span class="field-label">Carico (kg) \u2014 modificalo se ti sembra sbagliato</span>
+      <input type="number" id="strength-weight-input" step="0.5" value="${session.draft.customWeight ?? ''}" placeholder="es. 85" />
+    `;
+    $('#strength-weight-input').addEventListener('input', (e) => {
+      session.draft.customWeight = Number(e.target.value) || null;
+      persistSession();
+    });
+  } else {
+    areaEl.innerHTML = `
+      <div style="display:flex; gap:8px;">
+        <div style="flex:1;">
+          <span class="field-label">Serie</span>
+          <input type="number" id="strength-sets-input" value="${session.draft.customSets}" />
+        </div>
+        <div style="flex:1;">
+          <span class="field-label">Ripetizioni</span>
+          <input type="number" id="strength-reps-input" value="${session.draft.customReps}" />
+        </div>
+        <div style="flex:1;">
+          <span class="field-label">Carico (kg)</span>
+          <input type="number" id="strength-weight-input" step="0.5" value="${session.draft.customWeight ?? ''}" placeholder="es. 85" />
+        </div>
+      </div>
+    `;
+    $('#strength-sets-input').addEventListener('input', (e) => { session.draft.customSets = Number(e.target.value) || content.rx.sets; persistSession(); });
+    $('#strength-reps-input').addEventListener('input', (e) => { session.draft.customReps = Number(e.target.value) || content.rx.reps; persistSession(); });
+    $('#strength-weight-input').addEventListener('input', (e) => { session.draft.customWeight = Number(e.target.value) || null; persistSession(); });
+  }
 }
 
 function bindBoolChips(selector, draftKey, defaultVal) {
@@ -708,28 +890,107 @@ function renderManualBuilder() {
 function renderManualWodArea() {
   const content = state.session.content;
   const areaEl = $('#manual-wod-area');
+
   if (content.wodMode === 'generate') {
     if (content.generatedWod) {
-      areaEl.innerHTML = renderWodMainOnly(content.generatedWod) + '<button type="button" class="btn btn-secondary" id="btn-manual-regen" style="margin-top:8px;">Rigenera WOD</button>';
-      $('#btn-manual-regen').addEventListener('click', generateManualWod);
-    } else {
-      areaEl.innerHTML = '<button type="button" class="btn btn-primary" id="btn-manual-gen">Genera WOD</button>';
-      $('#btn-manual-gen').addEventListener('click', generateManualWod);
+      areaEl.innerHTML = renderWodMainOnly(content.generatedWod) + '<button type="button" class="btn btn-secondary" id="btn-manual-regen">Rigenera</button>';
+      $('#btn-manual-regen').addEventListener('click', () => { content.generatedWod = null; persistSession(); renderManualBuilder(); });
+      return;
     }
-  } else {
+
+    const formatDef = ASSISTED_FORMAT_TABS.find(f => f.id === content.assistFormat) || ASSISTED_FORMAT_TABS[0];
+    // Keep the movement list the right length for the chosen format.
+    while (content.assistMovementIds.length < formatDef.maxMoves) content.assistMovementIds.push(null);
+    content.assistMovementIds = content.assistMovementIds.slice(0, formatDef.maxMoves);
+
+    const profile = state.profile || defaultProfile();
+    const usable = MOVEMENTS.filter(m => !m.recoveryOnly && m.equipment.every(e => profile.equipment.includes(e)));
+    const options = usable.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+
+    let slotsHtml = '';
+    for (let i = 0; i < formatDef.maxMoves; i++) {
+      const isRequired = i < formatDef.minMoves;
+      slotsHtml += `
+        <div class="assist-move-row">
+          <select class="assist-move-select" data-i="${i}">
+            <option value="">${isRequired ? '\u2014 scegli movimento \u2014' : '\u2014 (opzionale) \u2014'}</option>
+            ${options}
+          </select>
+        </div>
+      `;
+    }
+
     areaEl.innerHTML = `
-      <input type="text" id="manual-format" placeholder="es. AMRAP 15, For Time, 5x5..." value="${content.formatLabel || ''}" />
-      <div id="manual-rows"></div>
-      <button type="button" class="btn btn-secondary" id="btn-manual-add-row" style="margin-top:8px;">+ Aggiungi movimento</button>
+      <div class="tab-strip" id="assist-format-tabs"></div>
+      <p class="small muted" style="margin:8px 0;">Scegli ${formatDef.minMoves}${formatDef.maxMoves > formatDef.minMoves ? `-${formatDef.maxMoves}` : ''} movimenti \u2014 il motore calcola reps, round e carichi.</p>
+      ${slotsHtml}
+      <button type="button" class="btn btn-primary" id="btn-assist-generate" style="margin-top:10px;">Genera WOD</button>
     `;
-    $('#manual-format').addEventListener('input', (e) => { content.formatLabel = e.target.value; persistSession(); });
-    renderManualRows();
-    $('#btn-manual-add-row').addEventListener('click', () => {
-      content.rows.push({ movementId: MOVEMENTS[0].id, reps: '' });
-      persistSession();
-      renderManualRows();
+
+    const tabsEl = $('#assist-format-tabs');
+    tabsEl.innerHTML = ASSISTED_FORMAT_TABS.map(f => `<button type="button" class="tab-strip-btn${f.id === content.assistFormat ? ' active' : ''}" data-format="${f.id}">${f.label}</button>`).join('');
+    tabsEl.querySelectorAll('.tab-strip-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        content.assistFormat = btn.dataset.format;
+        persistSession();
+        renderManualWodArea();
+      });
     });
+
+    areaEl.querySelectorAll('.assist-move-select').forEach(sel => {
+      const i = Number(sel.dataset.i);
+      sel.value = content.assistMovementIds[i] || '';
+      sel.addEventListener('change', (e) => {
+        content.assistMovementIds[i] = e.target.value || null;
+        persistSession();
+      });
+    });
+
+    $('#btn-assist-generate').addEventListener('click', () => {
+      const chosen = content.assistMovementIds.filter(Boolean);
+      if (chosen.length < formatDef.minMoves) {
+        toast(`Scegli almeno ${formatDef.minMoves} movimento${formatDef.minMoves > 1 ? 'i' : ''}`);
+        return;
+      }
+      generateAssistedWod(formatDef.id, chosen);
+    });
+    return;
   }
+
+  areaEl.innerHTML = `
+    <input type="text" id="manual-format" placeholder="es. AMRAP 15, For Time, 5x5..." value="${content.formatLabel || ''}" />
+    <div id="manual-rows"></div>
+    <button type="button" class="btn btn-secondary" id="btn-manual-add-row" style="margin-top:8px;">+ Aggiungi movimento</button>
+  `;
+  $('#manual-format').addEventListener('input', (e) => { content.formatLabel = e.target.value; persistSession(); });
+  renderManualRows();
+  $('#btn-manual-add-row').addEventListener('click', () => {
+    content.rows.push({ movementId: MOVEMENTS[0].id, reps: '' });
+    persistSession();
+    renderManualRows();
+  });
+}
+
+function generateAssistedWod(format, movementIds) {
+  const session = state.session;
+  const content = session.content;
+  const profile = state.profile || defaultProfile();
+  const hasCentral = content.focusType !== 'solo_wod';
+  const split = splitSessionMinutes(session.availableMinutes, hasCentral);
+
+  content.generatedWod = generateWodFromMovements({
+    format, movementIds,
+    availableMinutes: split.wod,
+    level: profile.level, equipment: profile.equipment, limitations: profile.limitations,
+    readinessScore: session.readinessScore, band: readinessBand(session.readinessScore),
+    gender: profile.gender || null, oneRMs: profile.oneRMs || {},
+  });
+  if (!content.generatedWod) {
+    toast('Attrezzatura non compatibile con questi movimenti');
+    return;
+  }
+  persistSession();
+  renderManualBuilder();
 }
 
 function renderManualRows() {
@@ -752,18 +1013,6 @@ function renderManualRows() {
     rowEl.querySelector('.manual-row-reps').addEventListener('input', (e) => { rows[i].reps = e.target.value; persistSession(); });
     rowEl.querySelector('.manual-row-remove').addEventListener('click', () => { rows.splice(i, 1); persistSession(); renderManualRows(); });
   });
-}
-
-function generateManualWod() {
-  const session = state.session;
-  const content = session.content;
-  const profile = state.profile || defaultProfile();
-  const focusPatterns = manualFocusPatterns(content);
-  const hasCentral = content.focusType !== 'solo_wod';
-  const split = splitSessionMinutes(session.availableMinutes, hasCentral);
-  content.generatedWod = buildFocusAvoidingWod(split.wod, focusPatterns, session, profile);
-  persistSession();
-  renderManualBuilder();
 }
 
 function persistSession() {
@@ -812,6 +1061,10 @@ $('#btn-endsession-save').addEventListener('click', () => {
       patternsHit = ((getMovement(plan.movementId) || {}).patterns || []).concat(content.wod.patternsHit || []);
     }
     extraFields.planId = content.planId;
+    extraFields.actualSets = session.draft.customSets;
+    extraFields.actualReps = session.draft.customReps;
+    extraFields.actualWeightKg = session.draft.customWeight;
+    extraFields.weightMode = session.draft.weightMode;
   } else if (content && content.type === 'skill' && completion > 0) {
     const plan = getPlan(content.planId);
     if (plan) {

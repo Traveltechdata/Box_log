@@ -4,8 +4,13 @@ import { allocateTime } from './scaling.js';
 export function validate(candidate, context) {
   const violations = [];
 
-  const time = allocateTime(context.availableMinutes);
-  const totalEstimate = time.warmup + candidate.estimatedMinutes + time.cooldown;
+  let totalEstimate;
+  if (context.noOverhead) {
+    totalEstimate = candidate.estimatedMinutes;
+  } else {
+    const time = allocateTime(context.availableMinutes);
+    totalEstimate = time.warmup + candidate.estimatedMinutes + time.cooldown;
+  }
   if (totalEstimate > context.availableMinutes + 5) {
     violations.push('time_exceeded');
   }
