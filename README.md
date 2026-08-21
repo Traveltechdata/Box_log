@@ -5,13 +5,13 @@ Web app personale (PWA) strutturata come un vero percorso di allenamento: crei u
 ## Il modello: Piano -> Sessione
 
 - **Piano**: un percorso con memoria persistente verso un obiettivo. Tre tipi:
-  - **Forza** - progressione lineare 3x5. Parti da un 1RM misurato, il carico sale ad ogni sessione riuscita, si scarica automaticamente dopo 2 fallimenti di fila. Retest del massimale ogni 6 settimane.
+  - **Forza** - progressione lineare 3x5. Parti da un 1RM misurato, il carico sale ad ogni sessione riuscita, si scarica automaticamente dopo 2 fallimenti di fila. Retest del massimale ogni 6 settimane. Ogni sessione ti chiede se vuoi il carico **calcolato automaticamente** (modificabile in ogni momento se ti sembra sbagliato) oppure se preferisci **personalizzare** tu serie, ripetizioni e carico.
   - **Skill** - scala di propedeutici (muscle-up, chest-to-bar, toes-to-bar, pistol squat, handstand walk, rope climb). Avanzi allo step successivo solo dopo 1-2 sessioni "pulite" consecutive sullo step attuale, mai per il calendario.
   - **Metcon** - mesociclo di 6 settimane su un benchmark che scegli tu. Settimana 1 = test baseline, settimane 2-5 = formati che aumentano volume/intensita in sequenza fissa (non casuale), settimana 6 = retest sullo stesso benchmark per misurare il progresso reale.
 - **Rotazione automatica**: ogni giorno l'app calcola quale piano attivo e piu "in ritardo" rispetto alla sua cadenza settimanale e lo propone - non serve un calendario fisso da gestire a mano.
 - **Sessione**: ha un ciclo di vita esplicito.
   1. **Inizia sessione** -> scegli guidata dal piano / monostrutturale / manuale, poi imposti tempo disponibile e stato fisico **una sola volta**. Questi valori restano bloccati per tutta la sessione (persistiti, sopravvivono a cambi di tab o al chiudere l'app).
-  2. **Esecuzione** -> ogni sessione guidata (Forza o Skill) segue sempre la struttura completa **Warm-up -> fase centrale -> WOD**: il WOD finale evita attivamente il pattern di movimento appena lavorato (es. dopo il back squat, il WOD non ripropone movimenti squat), con un timer visibile che scorre durante tutta la sessione.
+  2. **Esecuzione** -> premi il pulsante rotondo **INIZIA** quando sei pronto: parte un timer a fasi che scorre Warm-up -> fase centrale -> WOD, con conto alla rovescia per fase e avanzamento automatico (o manuale, con "Fase successiva"). Ogni sessione guidata (Forza o Skill) segue sempre la struttura completa **Warm-up -> fase centrale -> WOD**: il WOD finale evita attivamente il pattern di movimento appena lavorato, dura sempre tra 8 e 25 minuti, ed e sempre composto da movimenti reali e intensi (mai un solo esercizio leggero per pochi minuti).
   3. **Termina sessione** -> completamento 100% / 50% / non eseguito + RPE. Questo aggiorna il piano collegato e va nello storico. In qualsiasi momento puoi premere **Annulla sessione** per tornare alla home senza salvare nulla, se cambi idea.
 - **Sotto i 30 minuti** l'app non salta l'allenamento ne comprime uno step pieno: propone mobilita o un movimento leggero. Da 30 a 90 minuti la durata scala normalmente.
 - **Piu piani in parallelo**: puoi avere piu piani attivi contemporaneamente, anche dello stesso tipo (es. due piani Forza su movimenti diversi) - la rotazione automatica li propone tutti a turno in base a quanto ciascuno e "in ritardo".
@@ -20,7 +20,7 @@ Web app personale (PWA) strutturata come un vero percorso di allenamento: crei u
 
 1. **Guidata dal piano** - l'app pesca lo step dovuto e lo prescrive per intero.
 2. **Monostrutturale** - corsa outdoor, bici su strada, nuoto, vogatore o bike indoor: scegli l'attivita, registri distanza e durata reali a fine sessione.
-3. **Manuale** - scegli prima il focus di oggi (Solo WOD / Forza / Skill), poi decidi se il WOD lo scrivi tu (movimenti dal database interno) o lo generi l'app - in entrambi i casi il warm-up viene costruito automaticamente sui pattern coinvolti.
+3. **Manuale** - scegli prima il focus di oggi (Solo WOD / Forza / Skill), poi decidi il WOD: **lo scrivo io** (movimenti dal database interno) oppure **genera tu**, scegliendo tra tab di formato ben separate (For Time / AMRAP / EMOM / Total reps) e 2-3 movimenti - il motore calcola reps, round e carichi. Il warm-up viene sempre costruito automaticamente sui pattern coinvolti.
 
 ## Cosa tiene traccia di cosa
 
