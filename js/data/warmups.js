@@ -40,18 +40,34 @@ export const PATTERN_WARMUP = {
     { name: 'Farmer carry leggero', prescription: '2x20m' },
   ],
   jump: [
-    { name: 'Step-up su box (senza salto)', prescription: '2x8' },
+    { name: 'Salti sul posto leggeri', prescription: '2x20"' },
+    { name: 'Single-under di prova (ritmo, non velocità)', prescription: '2x20' },
   ],
   lunge: [
     { name: 'Walking lunge senza carico', prescription: '2x10' },
   ],
-  cyclical: [],
+  cyclical: [
+    { name: 'Cambi di ritmo leggeri sulla macchina scelta', prescription: '3x20"' },
+  ],
   mobility: [],
 };
 
+// Baseline drills used to top up a thin warm-up (e.g. single-movement sessions
+// where only one or two patterns are involved) so it never feels like an afterthought.
+const GENERIC_TOPUP = [
+  { name: 'Leg swing (avanti/indietro e laterali)', prescription: '2x10 per lato' },
+  { name: 'Arm circle + band pull-apart', prescription: '2x10' },
+  { name: 'Inchworm walk-out', prescription: '2x5' },
+];
+
 export function warmupDrillsForPatterns(patterns) {
-  const unique = [...new Set(patterns)].filter(p => PATTERN_WARMUP[p] && PATTERN_WARMUP[p].length > 0);
-  return unique.slice(0, 3).flatMap(p => PATTERN_WARMUP[p]);
+  const unique = [...new Set(patterns)].filter(p => PATTERN_WARMUP[p]);
+  let drills = unique.slice(0, 3).flatMap(p => PATTERN_WARMUP[p]);
+  if (drills.length < 2) {
+    const need = 2 - drills.length;
+    drills = drills.concat(GENERIC_TOPUP.slice(0, need));
+  }
+  return drills;
 }
 
 export function pickGeneralRaise(equipment) {

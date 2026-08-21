@@ -1,8 +1,12 @@
+import { allocateTime } from './scaling.js';
+
 // Blocking rules must return zero violations for a candidate to be usable.
 export function validate(candidate, context) {
   const violations = [];
 
-  if (candidate.estimatedMinutes > context.availableMinutes + 4) {
+  const time = allocateTime(context.availableMinutes);
+  const totalEstimate = time.warmup + candidate.estimatedMinutes + time.cooldown;
+  if (totalEstimate > context.availableMinutes + 5) {
     violations.push('time_exceeded');
   }
 

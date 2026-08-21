@@ -1,5 +1,5 @@
 import { TEMPLATES } from '../data/templates.js';
-import { getMovement } from '../data/movements.js';
+import { getMovement, MOVEMENTS } from '../data/movements.js';
 import { pickMovement, readinessScaling, allocateTime } from './scaling.js';
 import { validate, score } from './validation.js';
 import { readinessBand } from './readiness.js';
@@ -22,6 +22,14 @@ function secPerRep(movement) {
   return SEC_PER_REP[movement.patterns[0]] || 3;
 }
 
+// Time-capped formats (AMRAP/EMOM/Tabata/Death By/Steady) should fill the time
+// the athlete actually has, not just default to the template's baseline duration.
+function fitDurationMinutes(template, context) {
+  const time = allocateTime(context.availableMinutes);
+  const target = Math.max(template.time_domain[0], context.availableMinutes - time.warmup - time.cooldown);
+  return Math.max(template.time_domain[0], Math.min(template.time_domain[1], Math.round(target)));
+}
+
 function loadTextFor(movement, loadMult, gender) {
   if (!movement.loadRx) return null;
   const m = Math.round((movement.loadRx.m * loadMult) * 2) / 2; // nearest 0.5kg
@@ -34,6 +42,18 @@ function loadTextFor(movement, loadMult, gender) {
 function pickMetconMovement(slot, context, usedIds) {
   const picked = pickMovement(slot, context, usedIds);
   return picked; // { movement, chain }
+}
+
+// For continuous/steady-state work, prefer machines actually suited to sustained
+// pacing (row/bike/ski erg/run) over high-skill, high-impact movements like jump
+// rope, which the variety/fatigue tie-break could otherwise select.
+function preferSustainedCardio(picked, context) {
+  if (picked && picked.movement.sustainedCardio) return picked;
+  const options = MOVEMENTS.filter(m => m.sustainedCardio && m.equipment.every(e => context.equipment.includes(e)));
+  if (options.length === 0) return picked;
+  const goalMatch = options.find(m => context.priorityMovementIds?.includes(m.id));
+  const choice = goalMatch || options[Math.floor(Math.random() * options.length)];
+  return { movement: choice, chain: [choice.id] };
 }
 
 function pickPreferredMovement(template, context) {
@@ -232,7 +252,7 @@ function buildAmrapRounds(template, context) {
     movements.push({ movement: picked.movement, chain: picked.chain });
   }
 
-  const durationMinutes = Math.max(template.time_domain[0], Math.min(template.time_domain[1], Math.round(template.duration)));
+  const durationMinutes = fitDurationMinutes(template, context);
 
   const displayMovements = movements.map(({ movement }, i) => {
     const reps = Math.max(4, Math.round(baseReps * (1 - 0.2 * i) * scalingInfo.volumeMult));
@@ -255,18 +275,28 @@ function buildAmrapRounds(template, context) {
 function buildAmrapReps(template, context) {
   const usedIds = new Set();
   const slot = template.movement_slots[0];
-  const picked = pickMetconMovement(slot, context, usedIds);
+  const requireCalorieCapable = template.repScheme.unitOverride === 'cal';
+  let picked = pickMetconMovement(slot, context, usedIds);
+
+  if (requireCalorieCapable && (!picked || !picked.movement.calorieCapable)) {
+    const calorieOnly = MOVEMENTS.filter(m => m.calorieCapable && m.equipment.every(e => context.equipment.includes(e)));
+    if (calorieOnly.length === 0) return null;
+    const goalMatch = calorieOnly.find(m => context.priorityMovementIds?.includes(m.id));
+    const choice = goalMatch || calorieOnly[Math.floor(Math.random() * calorieOnly.length)];
+    picked = { movement: choice, chain: [choice.id] };
+  }
   if (!picked) return null;
+
   const scalingInfo = readinessScaling(context.readinessBand);
-  const durationMinutes = Math.max(template.time_domain[0], Math.min(template.time_domain[1], Math.round(template.duration)));
+  const durationMinutes = fitDurationMinutes(template, context);
   const unit = template.repScheme.unitOverride || (picked.movement.modality === 'monostructural' ? 'm' : 'reps');
 
   return {
     mainMovements: [{ movement: picked.movement, chain: picked.chain }],
     estimatedMinutes: durationMinutes,
     goalMatch: template.goals.includes(context.goal),
-    structureText: `AMRAP reps ${durationMinutes}\u2019 \u2014 massime ripetizioni totali`,
-    scoreType: `Reps totali (${unit})`,
+    structureText: `AMRAP reps ${durationMinutes}\u2019 \u2014 massime ${unit === 'cal' ? 'calorie' : 'ripetizioni'} totali`,
+    scoreType: unit === 'cal' ? 'Calorie totali' : 'Reps totali',
     displayMovements: [{ name: picked.movement.name, repsText: 'max', loadText: loadTextFor(picked.movement, scalingInfo.loadMult, context.gender) }],
     targetRpe: template.target_rpe,
     capRpe: scalingInfo.capRPE,
@@ -286,7 +316,7 @@ function buildEmom(template, context) {
     movements.push({ movement: picked.movement, chain: picked.chain });
   }
 
-  const durationMinutes = Math.max(template.time_domain[0], Math.min(template.time_domain[1], Math.round(template.duration)));
+  const durationMinutes = fitDurationMinutes(template, context);
   const repsPerMinute = Math.max(2, Math.round(template.repScheme.repsPerMinute * scalingInfo.volumeMult));
 
   const displayMovements = movements.map(({ movement }) => ({
@@ -354,7 +384,7 @@ function buildDeathBy(template, context) {
   const picked = pickMetconMovement(slot, context, usedIds);
   if (!picked) return null;
   const scalingInfo = readinessScaling(context.readinessBand);
-  const durationMinutes = Math.max(template.time_domain[0], Math.min(template.time_domain[1], Math.round(template.duration)));
+  const durationMinutes = fitDurationMinutes(template, context);
 
   return {
     mainMovements: [{ movement: picked.movement, chain: picked.chain }],
@@ -373,12 +403,15 @@ function buildSteadyOrRecovery(template, context) {
   const usedIds = new Set();
   const movements = [];
   for (const slot of template.movement_slots) {
-    const picked = pickMetconMovement(slot, context, usedIds);
+    let picked = pickMetconMovement(slot, context, usedIds);
     if (!picked) return null;
+    if (template.format === 'STEADY' && slot.pattern === 'cyclical') {
+      picked = preferSustainedCardio(picked, context);
+    }
     usedIds.add(picked.movement.id);
     movements.push({ movement: picked.movement, chain: picked.chain });
   }
-  const durationMinutes = Math.max(template.time_domain[0], Math.min(template.time_domain[1], Math.round(template.duration)));
+  const durationMinutes = fitDurationMinutes(template, context);
   const label = { STEADY: 'Steady state', RECOVERY: 'Recovery', TECHNICAL: 'Tecnica leggera' }[template.format] || template.format;
 
   return {
@@ -441,6 +474,7 @@ export function generateWod(input) {
   const {
     goal, availableMinutes, level, equipment, limitations,
     recentPatterns, forceRecovery, priorityMovementIds, oneRMs, recentTemplateIds, gender,
+    forceFormat,
   } = input;
 
   const band = input.band || readinessBand(input.readinessScore);
@@ -460,8 +494,20 @@ export function generateWod(input) {
     t.goals.includes(goal) &&
     availableMinutes >= t.time_domain[0] * 0.5 &&
     !isRecoveryTemplate(t) &&
-    (!t.high_readiness_only || band.key === 'high')
+    (!t.high_readiness_only || band.key === 'high') &&
+    (!forceFormat || t.format === forceFormat)
   );
+
+  if (pool.length === 0 && forceFormat) {
+    // The requested format doesn't exist for this goal/time window — drop the
+    // constraint rather than fail the whole session.
+    pool = TEMPLATES.filter(t =>
+      t.goals.includes(goal) &&
+      availableMinutes >= t.time_domain[0] * 0.5 &&
+      !isRecoveryTemplate(t) &&
+      (!t.high_readiness_only || band.key === 'high')
+    );
+  }
 
   if (forceRecovery || band.key === 'low') {
     pool = TEMPLATES.filter(isRecoveryTemplate);

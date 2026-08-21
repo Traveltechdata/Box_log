@@ -7,10 +7,10 @@
 
 export const MOVEMENTS = [
   // ---- Cyclical / monostructural ----
-  { id: 'run', name: 'Corsa', patterns: ['cyclical'], modality: 'monostructural', skill: 1, fatigue: 3, grip: 1, impact: 4, equipment: [], substitutions: ['row', 'bike'] },
-  { id: 'row', name: 'Vogatore (row)', patterns: ['cyclical'], modality: 'monostructural', skill: 1, fatigue: 3, grip: 2, impact: 1, equipment: ['rower'], substitutions: ['bike', 'run'] },
-  { id: 'bike', name: 'Bike/Assault bike', patterns: ['cyclical'], modality: 'monostructural', skill: 1, fatigue: 3, grip: 1, impact: 1, equipment: ['bike'], substitutions: ['row', 'run'] },
-  { id: 'ski_erg', name: 'Ski erg', patterns: ['cyclical'], modality: 'monostructural', skill: 2, fatigue: 3, grip: 2, impact: 1, equipment: ['ski_erg'], substitutions: ['row', 'bike'] },
+  { id: 'run', name: 'Corsa', patterns: ['cyclical'], modality: 'monostructural', skill: 1, fatigue: 3, grip: 1, impact: 4, equipment: [], distanceCapable: true, sustainedCardio: true, substitutions: ['row', 'bike'] },
+  { id: 'row', name: 'Vogatore (row)', patterns: ['cyclical'], modality: 'monostructural', skill: 1, fatigue: 3, grip: 2, impact: 1, equipment: ['rower'], calorieCapable: true, sustainedCardio: true, substitutions: ['bike', 'run'] },
+  { id: 'bike', name: 'Bike/Assault bike', patterns: ['cyclical'], modality: 'monostructural', skill: 1, fatigue: 3, grip: 1, impact: 1, equipment: ['bike'], calorieCapable: true, sustainedCardio: true, substitutions: ['row', 'run'] },
+  { id: 'ski_erg', name: 'Ski erg', patterns: ['cyclical'], modality: 'monostructural', skill: 2, fatigue: 3, grip: 2, impact: 1, equipment: ['ski_erg'], calorieCapable: true, sustainedCardio: true, substitutions: ['row', 'bike'] },
   { id: 'double_under', name: 'Double-under', patterns: ['cyclical', 'jump'], modality: 'monostructural', skill: 3, fatigue: 2, grip: 2, impact: 3, equipment: ['jump_rope'], substitutions: ['single_under', 'row'] },
   { id: 'single_under', name: 'Single-under (corda singola)', patterns: ['cyclical', 'jump'], modality: 'monostructural', skill: 1, fatigue: 1, grip: 1, impact: 2, equipment: ['jump_rope'], substitutions: [] },
 

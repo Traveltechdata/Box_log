@@ -1,88 +1,74 @@
-# Box Log — WOD adattivo
+# Box Log - coach digitale CrossFit
 
-Web app personale (PWA) per generare allenamenti CrossFit adattati a obiettivo, tempo disponibile e readiness del giorno. Nessun account, nessun backend: tutto vive nel browser del tuo iPhone/Mac tramite `localStorage`.
+Web app personale (PWA) strutturata come un vero percorso di allenamento: crei un **Piano** (Forza, Skill o Metcon) verso un obiettivo, l'app misura il punto di partenza, propone ogni giorno lo step dovuto, e ricorda dove sei arrivato - non genera mai un allenamento a caso. Nessun account, nessun backend: tutto vive nel browser tramite `localStorage`.
 
-## Come funziona
+## Il modello: Piano -> Sessione
 
-- **Profilo**: livello, attrezzatura disponibile, movimenti da evitare, **massimali (1RM)** sui sollevamenti principali, promemoria di allenamento.
-- **Check-in** (ogni volta che ti alleni): obiettivo, tempo disponibile, energia, sonno, stress, dolori → calcola una **readiness** 0–100.
-- **Generatore**: sceglie un formato WOD vero (For Time, AMRAP a round, AMRAP reps, EMOM, Tabata, Death By, Forza, Skill, Steady state) in base a obiettivo/tempo/readiness, con:
-  - **warm-up mirato** ai pattern di movimento della sessione (non generico);
-  - **Forza** con schema serie×reps×%1RM calcolato sui tuoi massimali (es. "5×5 @ 75% (90kg)");
-  - **Skill** con tentativi/serie tecniche esplicite, mai un movimento base;
-  - **metcon** con movimenti nominati, reps/carico Rx espliciti e struttura corretta per il formato (scaletta, round fissi, round+reps, reps/minuto, ecc.);
-  - **variet\u00e0 reale**: penalizza la ripetizione dello stesso WOD nelle sessioni recenti e sceglie casualmente tra le opzioni migliori, non sempre la stessa.
-  Se hai un obiettivo trimestrale attivo su un sollevamento, il generatore lo privilegia nelle sessioni di forza.
-- **Storico**: ogni WOD generato viene salvato; puoi segnarlo come svolto con l'RPE percepito, che alimenta il carico di allenamento (`durata × RPE`), visibile anche in un grafico di trend. Include una vista **calendario** con la possibilità di pianificare allenamenti futuri.
-- **Obiettivi**: traguardi a medio termine (es. "Back squat 110kg entro 3 mesi") con barra di avanzamento e stato (in linea / in ritardo / raggiunto / scaduto). Aggiornare il valore di un obiettivo su un sollevamento sincronizza automaticamente il tuo 1RM in Profilo.
-- **Motivazione**: streak di allenamenti, giorni dall'ultima sessione, messaggi incoraggianti, e promemoria configurabili (giorni + orario).
+- **Piano**: un percorso con memoria persistente verso un obiettivo. Tre tipi:
+  - **Forza** - progressione lineare 3x5. Parti da un 1RM misurato, il carico sale ad ogni sessione riuscita, si scarica automaticamente dopo 2 fallimenti di fila. Retest del massimale ogni 6 settimane.
+  - **Skill** - scala di propedeutici (muscle-up, chest-to-bar, toes-to-bar, pistol squat, handstand walk, rope climb). Avanzi allo step successivo solo dopo 1-2 sessioni "pulite" consecutive sullo step attuale, mai per il calendario.
+  - **Metcon** - mesociclo di 6 settimane su un benchmark che scegli tu. Settimana 1 = test baseline, settimane 2-5 = formati che aumentano volume/intensita in sequenza fissa (non casuale), settimana 6 = retest sullo stesso benchmark per misurare il progresso reale.
+- **Rotazione automatica**: ogni giorno l'app calcola quale piano attivo e piu "in ritardo" rispetto alla sua cadenza settimanale e lo propone - non serve un calendario fisso da gestire a mano.
+- **Sessione**: ha un ciclo di vita esplicito.
+  1. **Inizia sessione** -> scegli guidata dal piano / monostrutturale / manuale, poi imposti tempo disponibile e stato fisico **una sola volta**. Questi valori restano bloccati per tutta la sessione (persistiti, sopravvivono a cambi di tab o al chiudere l'app).
+  2. **Esecuzione** -> contenuto specifico per tipo (warm-up mirato + prescrizione Forza/Skill/metcon, oppure form libero per monostrutturali/manuale).
+  3. **Termina sessione** -> completamento 100% / 50% / non eseguito + RPE. Questo aggiorna il piano collegato e va nello storico.
+- **Sotto i 30 minuti** l'app non salta l'allenamento ne comprime uno step pieno: propone mobilita o un movimento leggero. Da 30 a 90 minuti la durata scala normalmente.
 
-Il motore è tutto deterministico (regole + punteggio + una quota di variet\u00e0 controllata), niente chiamate esterne: funziona anche offline una volta caricata la pagina la prima volta.
+## Le tre modalita di sessione
 
-### Nota sui promemoria
+1. **Guidata dal piano** - l'app pesca lo step dovuto e lo prescrive per intero.
+2. **Monostrutturale** - corsa outdoor, bici su strada, nuoto, vogatore o bike indoor: scegli l'attivita, registri distanza e durata reali a fine sessione.
+3. **Manuale** - scegli tu i movimenti (dal database interno) e il formato; l'app struttura la sessione ma non decide i numeri.
 
-Su desktop e Android, se concedi il permesso, ricevi una vera notifica del browser. **Su iPhone Safari le notifiche push richiedono un server dedicato**, che questa app (gratuita, senza backend) non ha: lì il promemoria compare come banner dentro l'app quando la apri, non come notifica in background. È una limitazione della piattaforma, non un bug.
+## Cosa tiene traccia di cosa
+
+- **Piani** (tab "Piani"): crea/vedi i percorsi attivi, con retest dovuti evidenziati.
+- **Storico** (tab "Storico"): ogni sessione salvata con completamento, RPE, carico; grafico del carico di allenamento; vista calendario.
+- **Profilo**: dati anagrafici (nome, eta, peso, genere), attrezzatura, massimali (1RM) - genere e 1RM alimentano rispettivamente il carico Rx mostrato nei metcon e i carichi delle sessioni di Forza.
 
 ## Deploy gratuito su GitHub Pages
 
-1. Crea un nuovo repository su GitHub (es. `box-log`).
-2. Carica tutti i file di questa cartella nella root del repository (oppure, da terminale sul Mac):
-   ```bash
-   cd box-log
-   git init
-   git add .
-   git commit -m "Box Log v1"
-   git branch -M main
-   git remote add origin https://github.com/TUO_USERNAME/box-log.git
-   git push -u origin main
-   ```
-3. Su GitHub: **Settings → Pages → Source: Deploy from a branch → Branch: main / (root)** → Save.
-4. Dopo un paio di minuti il sito sarà live su `https://TUO_USERNAME.github.io/box-log/`.
+1. Crea un repository su GitHub (es. `box-log`).
+2. Carica **tutto** il contenuto di questa cartella nella root del repository (drag & drop dalla pagina "Upload files" di GitHub, oppure via terminale/Working Copy).
+3. Settings -> Pages -> Source: Deploy from a branch -> Branch: main / (root) -> Save.
+4. Dopo 1-2 minuti il sito e live su `https://TUO_USERNAME.github.io/box-log/`.
 
-## Installarla sull'iPhone
-
-1. Apri il link `https://TUO_USERNAME.github.io/box-log/` in **Safari** sull'iPhone.
-2. Tocca l'icona **Condividi** (il quadrato con la freccia verso l'alto).
-3. Scorri e tocca **Aggiungi alla schermata Home**.
-4. Da quel momento l'icona si apre come un'app a schermo intero, e funziona anche offline (grazie al service worker) dopo il primo caricamento.
-
-## Backup dei dati
-
-I dati restano solo su quel dispositivo/browser: se cancelli i dati di Safari o cambi telefono li perdi. Nella tab **Storico** trovi **Esporta JSON** per salvare un backup e **Importa JSON** per ripristinarlo (anche su un altro dispositivo).
-
-## Estendere il motore
-
-- `js/data/movements.js` — database dei movimenti (pattern, skill, fatica, attrezzatura, carico Rx, sostituzioni).
-- `js/data/templates.js` — formati WOD (FOR_TIME, AMRAP_ROUNDS, AMRAP_REPS, EMOM, TABATA, DEATH_BY, STRENGTH, SKILL, STEADY, RECOVERY).
-- `js/data/warmups.js` — drill di riscaldamento specifici per pattern di movimento.
-- `js/generator/generateWod.js` — pipeline: obiettivo → template → costruttore di formato → movimenti/carichi → validazione → punteggio.
-- `js/generator/readiness.js` — calcolo readiness e training load.
-- `js/generator/scaling.js` — selezione movimenti, sostituzioni, scalatura per readiness/tempo.
-- `js/generator/validation.js` — regole bloccanti, scoring dei candidati e penalità anti-ripetizione.
-- `js/goals.js` — logica obiettivi trimestrali (progresso, stato, scadenza).
-- `js/motivation.js` — streak, messaggi motivazionali, logica promemoria.
-- `js/ui/calendar.js` — griglia calendario mensile.
-- `js/ui/chart.js` — grafici SVG (carico di allenamento, volume settimanale).
-- `js/storage.js` — persistenza `localStorage` (profilo con 1RM, sessioni, obiettivi, promemoria).
-
-Aggiungere un movimento o un template è questione di aggiungere una entry nei rispettivi file dati: il generatore lo userà automaticamente se rientra nei pattern/goal giusti.
-
-## Prossimi passi possibili
-
-- Sincronizzazione multi-dispositivo con Supabase (auth + database cloud) — utile anche per notifiche push reali su iPhone tramite un piccolo servizio backend.
-- Badge/traguardi motivazionali aggiuntivi.
-- App nativa Swift/SwiftUI se in futuro serve HealthKit, Apple Watch o notifiche push native.
+Su iPhone: apri il link in Safari -> icona Condividi -> **Aggiungi alla schermata Home**.
 
 ## Come verificare che un aggiornamento sia arrivato davvero
 
-In alto a sinistra, accanto al nome "Box Log", c'è un **numero di versione** (es. `v3 — 21 ago 2026`). Dopo ogni aggiornamento che carichi su GitHub:
+In alto a sinistra c'e un **numero di versione** (es. `v5 - 21 ago 2026`). Dopo ogni aggiornamento:
 
-1. Aspetta 1-2 minuti che GitHub Pages ripubblichi il sito.
-2. Su iPhone, se l'app è già installata sulla Home, **chiudila del tutto** (swipe up e via dalle app recenti) e riaprila.
-3. Controlla il numero di versione in alto: se è cambiato, l'aggiornamento è arrivato. Se è lo stesso di prima, il telefono sta ancora mostrando la versione in cache — vai su Impostazioni Safari → Avanzate → Dati dei siti web, cerca il tuo dominio GitHub Pages e cancellalo, oppure rimuovi l'icona dalla Home e riaggiungila da Safari.
+1. Aspetta 1-2 minuti che GitHub Pages ripubblichi.
+2. Chiudi del tutto l'app (swipe up dalle app recenti) e riaprila.
+3. Controlla il numero di versione: se non e cambiato, il telefono sta mostrando una versione in cache - vai su Impostazioni Safari -> Avanzate -> Dati dei siti web, cancella il dominio, oppure rimuovi l'icona dalla Home e riaggiungila.
 
-Prima di questa versione, il Service Worker (il meccanismo che fa funzionare l'app offline) usava una cache "vecchia per sempre" che poteva mascherare gli aggiornamenti anche dopo un upload riuscito. Ora la cache si aggiorna automaticamente ad ogni nuova visita online.
+Il Service Worker usa una strategia network-first: prova sempre a scaricare l'ultima versione online, e usa la cache solo come riserva offline.
 
 ## Se carichi i file da iPad
 
-Il drag-and-drop di cartelle intere da Safari/File su iPad non è sempre affidabile. Se noti che l'app non si aggiorna nonostante tu abbia "caricato tutto", la causa più probabile è che l'upload sia stato parziale (mancano dei file dentro `js/`). Verifica direttamente su github.com, dentro il tuo repository, che la cartella `js/data/` contenga `warmups.js` — se manca, l'upload non è completo. Per lavori di questo tipo su iPad, un client Git dedicato come **Working Copy** è molto più affidabile del trascinamento tra app.
+Il drag-and-drop di cartelle intere da Safari/File non e sempre affidabile. Se l'app sembra non aggiornarsi, verifica su github.com che la cartella `js/data/` contenga `skills.js` e che `js/generator/` contenga `planEngine.js` - se mancano, l'upload e stato parziale. Per questo tipo di lavoro un client Git dedicato come **Working Copy** e molto piu affidabile del trascinamento tra app.
+
+## Struttura del codice
+
+- `js/data/movements.js` - database movimenti (pattern, skill, fatica, attrezzatura, carico Rx, sostituzioni).
+- `js/data/templates.js` - formati metcon (FOR_TIME, AMRAP_ROUNDS, AMRAP_REPS, EMOM, TABATA, DEATH_BY, STEADY, RECOVERY).
+- `js/data/skills.js` - le 6 scale di propedeutici skill, con criteri di avanzamento espliciti.
+- `js/data/warmups.js` - drill di riscaldamento specifici per pattern di movimento.
+- `js/generator/planEngine.js` - creazione piani, progressione forza/skill/metcon, rotazione automatica tra piani attivi.
+- `js/generator/generateWod.js` - costruttore di metcon per formato (usato dai piani metcon).
+- `js/generator/readiness.js`, `scaling.js`, `validation.js` - readiness, scalatura, scoring/varieta.
+- `js/storage.js` - persistenza `localStorage`: profilo, piani, sessioni (inclusa la **sessione attiva**, che rende il ciclo Inizia/Termina resistente ai cambi schermata), promemoria.
+- `js/motivation.js`, `js/ui/calendar.js`, `js/ui/chart.js` - streak/promemoria, calendario, grafici.
+- `js/app.js` - controller UI: ciclo di vita sessione, gestione piani, storico, profilo.
+
+## Prossimi passi (ordine concordato)
+
+Questa versione copre la **Fase 1**: CrossFit ristrutturato con architettura Piano->Sessione, piu il framework condiviso (monostrutturali, toggle di completamento, sessione persistente). Le fasi successive, non ancora costruite:
+
+2. HYROX - piano basato sulle 8 stazioni ufficiali (SkiErg, Sled push/pull, Burpee broad jump, Row, Farmer's carry, Sandbag lunge, Wall ball) con fasi base -> compromised running -> simulazione.
+3. ATHX - piano sui 3 blocchi (Forza / Endurance / Metcon X) con simulazione completa a 2,5h come retest.
+4. Triathlon Sprint (750m/20km/5km) - piano di endurance multi-disciplina, senza scadenza gara fissa.
+
+Sincronizzazione multi-dispositivo (Supabase) resta un'estensione futura, utile anche per notifiche push reali su iPhone.

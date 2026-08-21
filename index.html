@@ -28,61 +28,96 @@
   <!-- ================= OGGI ================= -->
   <main class="view active" id="view-today">
 
-    <section class="card" id="readiness-card" style="display:none;">
-      <div class="readiness-wrap">
-        <svg id="readiness-dial" width="180" height="110" viewBox="0 0 180 110"></svg>
-        <div class="readiness-score" id="readiness-score-num">–</div>
-        <div class="readiness-label" id="readiness-label-txt">–</div>
-        <div class="readiness-sub" id="readiness-sub-txt"></div>
-      </div>
-    </section>
+    <!-- STATE A: no active session -->
+    <div id="presession-wrap">
+      <section class="card" id="due-plan-card">
+        <h2>Prossimo allenamento</h2>
+        <div id="due-plan-content"></div>
+      </section>
 
-    <section class="card" id="checkin-card">
-      <h2>Check-in di oggi</h2>
+      <section class="card">
+        <h2>Inizia una sessione</h2>
+        <div class="btn-row" style="flex-direction:column; gap:10px;">
+          <button class="btn btn-primary" id="btn-start-guided">Sessione guidata dal piano</button>
+          <button class="btn btn-secondary" id="btn-start-mono">Monostrutturale (corsa, bici&hellip;)</button>
+          <button class="btn btn-secondary" id="btn-start-manual">Manuale (scelgo io)</button>
+        </div>
+      </section>
+    </div>
 
-      <span class="field-label">Obiettivo della sessione</span>
-      <div class="chip-group" id="goal-chips"></div>
+    <!-- STATE B: check-in before locking the session -->
+    <div id="checkin-wrap" style="display:none;">
+      <section class="card">
+        <h2>Check-in di oggi</h2>
+        <span class="field-label">Tempo disponibile</span>
+        <div class="chip-group" id="time-chips"></div>
 
-      <span class="field-label">Tempo disponibile</span>
-      <div class="chip-group" id="time-chips"></div>
+        <div class="slider-row">
+          <div class="slider-top"><span>Energia</span><span class="val" id="val-energy">3</span></div>
+          <input type="range" min="1" max="5" value="3" id="in-energy" />
+        </div>
+        <div class="slider-row">
+          <div class="slider-top"><span>Qualità del sonno</span><span class="val" id="val-sleep">3</span></div>
+          <input type="range" min="1" max="5" value="3" id="in-sleep" />
+        </div>
+        <div class="slider-row">
+          <div class="slider-top"><span>Stress percepito</span><span class="val" id="val-stress">3</span></div>
+          <input type="range" min="1" max="5" value="3" id="in-stress" />
+        </div>
+        <div class="slider-row">
+          <div class="slider-top"><span>Dolori / rigidità</span><span class="val" id="val-soreness">2</span></div>
+          <input type="range" min="1" max="5" value="2" id="in-soreness" />
+        </div>
 
-      <div class="slider-row">
-        <div class="slider-top"><span>Energia</span><span class="val" id="val-energy">3</span></div>
-        <input type="range" min="1" max="5" value="3" id="in-energy" />
-      </div>
-      <div class="slider-row">
-        <div class="slider-top"><span>Qualità del sonno</span><span class="val" id="val-sleep">3</span></div>
-        <input type="range" min="1" max="5" value="3" id="in-sleep" />
-      </div>
-      <div class="slider-row">
-        <div class="slider-top"><span>Stress percepito</span><span class="val" id="val-stress">3</span></div>
-        <input type="range" min="1" max="5" value="3" id="in-stress" />
-      </div>
-      <div class="slider-row">
-        <div class="slider-top"><span>Dolori / rigidità</span><span class="val" id="val-soreness">2</span></div>
-        <input type="range" min="1" max="5" value="2" id="in-soreness" />
-      </div>
+        <section class="card" id="checkin-readiness-card" style="margin-top:14px;">
+          <div class="readiness-wrap">
+            <svg id="readiness-dial" width="180" height="110" viewBox="0 0 180 110"></svg>
+            <div class="readiness-score" id="readiness-score-num">–</div>
+            <div class="readiness-label" id="readiness-label-txt">–</div>
+            <div class="readiness-sub" id="readiness-sub-txt"></div>
+          </div>
+        </section>
 
-      <button class="btn btn-primary" id="btn-generate">Genera WOD</button>
-    </section>
+        <div class="btn-row">
+          <button class="btn btn-secondary" id="btn-checkin-cancel">Annulla</button>
+          <button class="btn btn-primary" id="btn-checkin-confirm">Conferma e inizia</button>
+        </div>
+      </section>
+    </div>
 
-    <section class="card" id="wod-card" style="display:none;">
-      <h3 id="wod-format-label">Sessione</h3>
-      <div class="wod-title" id="wod-title">–</div>
-      <div class="wod-stimulus" id="wod-stimulus"></div>
-      <hr class="chalk-rule" />
+    <!-- STATE C: active session in progress -->
+    <div id="session-wrap" style="display:none;">
+      <section class="card" id="session-header-card">
+        <div class="session-badge" id="session-kind-badge"></div>
+        <div class="wod-title" id="session-title">–</div>
+        <div class="wod-stimulus" id="session-subtitle"></div>
+      </section>
 
-      <div id="wod-blocks"></div>
+      <section class="card" id="session-content-card">
+        <div id="session-content"></div>
+      </section>
 
-      <hr class="chalk-rule" />
-      <h3>Perché questo WOD</h3>
-      <ul class="wod-reasons" id="wod-reasons"></ul>
+      <button class="btn btn-primary" id="btn-end-session" style="margin-top:4px;">Termina sessione</button>
+    </div>
 
-      <div class="btn-row">
-        <button class="btn btn-secondary" id="btn-regenerate">Rigenera</button>
-        <button class="btn btn-primary" id="btn-complete">Segna svolto</button>
-      </div>
-    </section>
+    <!-- STATE D: end-of-session log -->
+    <div id="endsession-wrap" style="display:none;">
+      <section class="card">
+        <h2>Come è andata?</h2>
+        <span class="field-label">Completamento</span>
+        <div class="chip-group" id="completion-chips"></div>
+
+        <div id="endsession-extra"></div>
+
+        <span class="field-label">RPE sessione (1–10)</span>
+        <input type="number" id="in-actual-rpe" min="1" max="10" value="7" />
+
+        <div class="btn-row">
+          <button class="btn btn-secondary" id="btn-endsession-cancel">Torna alla sessione</button>
+          <button class="btn btn-primary" id="btn-endsession-save">Salva e termina</button>
+        </div>
+      </section>
+    </div>
 
   </main>
 
@@ -138,41 +173,18 @@
     </section>
   </main>
 
-  <!-- ================= OBIETTIVI ================= -->
-  <main class="view" id="view-goals">
+  <!-- ================= PIANI ================= -->
+  <main class="view" id="view-plans">
     <section class="card">
-      <h2>I tuoi obiettivi</h2>
-      <div id="goals-list"></div>
+      <h2>I tuoi piani</h2>
+      <div id="plans-list"></div>
     </section>
 
-    <section class="card">
-      <h2>Nuovo obiettivo</h2>
-      <span class="field-label">Movimento o metrica</span>
-      <select id="goal-movement" class="select-input"></select>
-      <input type="text" id="goal-label-custom" placeholder="Nome obiettivo (se 'Altro')" style="display:none;" />
-
-      <div style="display:flex; gap:10px;">
-        <div style="flex:1;">
-          <span class="field-label">Valore attuale</span>
-          <input type="number" id="goal-start" placeholder="es. 90" />
-        </div>
-        <div style="flex:1;">
-          <span class="field-label">Obiettivo</span>
-          <input type="number" id="goal-target" placeholder="es. 110" />
-        </div>
-      </div>
-
-      <span class="field-label">Unità</span>
-      <div class="chip-group" id="goal-unit-chips"></div>
-
-      <span class="field-label">Direzione</span>
-      <div class="chip-group" id="goal-direction-chips"></div>
-
-      <span class="field-label">Scadenza</span>
-      <div class="chip-group" id="goal-date-chips"></div>
-      <input type="date" id="goal-date-custom" />
-
-      <button class="btn btn-primary" id="btn-add-goal" style="margin-top:6px;">Aggiungi obiettivo</button>
+    <section class="card" id="new-plan-card">
+      <h2>Nuovo piano</h2>
+      <span class="field-label">Tipo</span>
+      <div class="chip-group" id="new-plan-kind-chips"></div>
+      <div id="new-plan-form"></div>
     </section>
   </main>
 
@@ -192,6 +204,16 @@
       <input type="text" id="in-lastname" placeholder="Cognome" />
       <span class="field-label">Genere</span>
       <div class="chip-group" id="gender-chips"></div>
+      <div style="display:flex; gap:10px;">
+        <div style="flex:1;">
+          <span class="field-label">Età</span>
+          <input type="number" id="in-age" placeholder="es. 34" />
+        </div>
+        <div style="flex:1;">
+          <span class="field-label">Peso (kg)</span>
+          <input type="number" id="in-weight" placeholder="es. 78" />
+        </div>
+      </div>
     </section>
 
     <section class="card">
@@ -247,9 +269,9 @@
       <span class="tab-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-6 4 3 5-8"/></svg></span>
       Storico
     </button>
-    <button class="tab-btn" data-view="view-goals">
+    <button class="tab-btn" data-view="view-plans">
       <span class="tab-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="3"/></svg></span>
-      Obiettivi
+      Piani
     </button>
     <button class="tab-btn" data-view="view-profile">
       <span class="tab-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 5-6 8-6s6.5 2 8 6"/></svg></span>

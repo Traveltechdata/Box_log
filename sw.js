@@ -1,6 +1,6 @@
 // IMPORTANT: bump this on every release. It's the only thing that forces old
 // cached files (HTML/JS/CSS) out of the browser once a new version is deployed.
-const CACHE_NAME = 'box-log-v3-2026-08-21';
+const CACHE_NAME = 'box-log-v5-2026-08-21';
 const APP_SHELL = [
   './',
   './index.html',
@@ -15,10 +15,12 @@ const APP_SHELL = [
   './js/data/movements.js',
   './js/data/templates.js',
   './js/data/warmups.js',
+  './js/data/skills.js',
   './js/generator/generateWod.js',
   './js/generator/readiness.js',
   './js/generator/scaling.js',
   './js/generator/validation.js',
+  './js/generator/planEngine.js',
   './icons/icon-192.png',
   './icons/icon-512.png',
 ];

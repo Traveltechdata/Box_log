@@ -372,6 +372,35 @@ textarea { min-height: 60px; resize: vertical; }
 .summary-records { margin-top: 6px; }
 .summary-records .summary-row .v { color: var(--marker-yellow); font-family: var(--font-mono); }
 
+/* ---------- session lifecycle ---------- */
+.due-plan-title { font-weight: 600; font-size: 15px; margin-bottom: 4px; }
+.due-plan-detail { font-size: 13px; color: var(--chalk-dim); }
+.session-badge {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--marker-yellow);
+  color: var(--marker-yellow);
+  margin-bottom: 8px;
+}
+
+/* ---------- plan cards ---------- */
+.plan-item { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 12px; }
+.plan-item .row1 { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+.plan-title { font-weight: 600; font-size: 15px; }
+.plan-detail { font-size: 13px; color: var(--chalk-dim); }
+.plan-retest-due { margin-top: 6px; color: var(--marker-yellow); font-size: 12px; font-weight: 600; }
+
+/* ---------- manual session builder ---------- */
+.manual-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+.manual-row select.manual-row-movement { flex: 2; background: var(--board); border: 1px solid var(--line-strong); border-radius: var(--radius-sm); color: var(--chalk); padding: 8px; font-size: 13px; }
+.manual-row input.manual-row-reps { flex: 1; margin-bottom: 0; }
+.manual-row .manual-row-remove { color: var(--marker-red); font-size: 16px; padding: 4px 8px; }
+
 /* ---------- 1RM grid ---------- */
 .onerm-row {
   display: flex;

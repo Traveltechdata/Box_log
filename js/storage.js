@@ -3,6 +3,8 @@ const KEYS = {
   sessions: 'cfwod.sessions',
   goals: 'cfwod.goals',
   reminders: 'cfwod.reminders',
+  plans: 'cfwod.plans',
+  activeSession: 'cfwod.activeSession',
 };
 
 // ---------------- profile ----------------
@@ -88,6 +90,56 @@ export function completedSessionsSorted() {
     .sort((a, b) => new Date(a.date) - new Date(b.date));
 }
 
+// ---------------- plans ----------------
+export function getPlans() {
+  const raw = localStorage.getItem(KEYS.plans);
+  return raw ? JSON.parse(raw) : [];
+}
+
+function setPlans(plans) {
+  localStorage.setItem(KEYS.plans, JSON.stringify(plans));
+}
+
+export function savePlan(plan) {
+  const plans = getPlans();
+  plans.unshift(plan);
+  setPlans(plans);
+  return plan;
+}
+
+export function updatePlan(id, patchOrPlan) {
+  const plans = getPlans();
+  const idx = plans.findIndex(p => p.id === id);
+  if (idx === -1) return;
+  plans[idx] = { ...plans[idx], ...patchOrPlan };
+  setPlans(plans);
+  return plans[idx];
+}
+
+export function deletePlan(id) {
+  setPlans(getPlans().filter(p => p.id !== id));
+}
+
+export function getPlan(id) {
+  return getPlans().find(p => p.id === id) || null;
+}
+
+// ---------------- active session (persists across screen changes / reloads) ----------------
+// This is what actually fixes the "sliders reset" problem: once a session is
+// started, its duration/readiness/content live here, not in transient UI state.
+export function getActiveSession() {
+  const raw = localStorage.getItem(KEYS.activeSession);
+  return raw ? JSON.parse(raw) : null;
+}
+
+export function setActiveSession(session) {
+  localStorage.setItem(KEYS.activeSession, JSON.stringify(session));
+}
+
+export function clearActiveSession() {
+  localStorage.removeItem(KEYS.activeSession);
+}
+
 // ---------------- goals ----------------
 // goal: { id, label, movementId|null, unit, direction: 'increase'|'decrease',
 //         startValue, currentValue, targetValue, startDate, targetDate, achieved, notes }
@@ -134,6 +186,7 @@ export function exportData() {
     profile: getProfile(),
     sessions: getSessions(),
     goals: getGoals(),
+    plans: getPlans(),
     reminders: getReminderSettings(),
     exportedAt: new Date().toISOString(),
   };
@@ -145,6 +198,7 @@ export function importData(jsonString) {
   if (data.profile) localStorage.setItem(KEYS.profile, JSON.stringify(data.profile));
   if (data.sessions) localStorage.setItem(KEYS.sessions, JSON.stringify(data.sessions));
   if (data.goals) localStorage.setItem(KEYS.goals, JSON.stringify(data.goals));
+  if (data.plans) localStorage.setItem(KEYS.plans, JSON.stringify(data.plans));
   if (data.reminders) localStorage.setItem(KEYS.reminders, JSON.stringify(data.reminders));
 }
 
@@ -152,5 +206,7 @@ export function clearAll() {
   localStorage.removeItem(KEYS.profile);
   localStorage.removeItem(KEYS.sessions);
   localStorage.removeItem(KEYS.goals);
+  localStorage.removeItem(KEYS.plans);
   localStorage.removeItem(KEYS.reminders);
+  localStorage.removeItem(KEYS.activeSession);
 }
