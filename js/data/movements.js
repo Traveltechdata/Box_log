@@ -18,14 +18,14 @@ export const MOVEMENTS = [
   { id: 'air_squat', name: 'Air squat', patterns: ['squat'], modality: 'bodyweight', skill: 1, fatigue: 2, grip: 1, impact: 1, equipment: [], substitutions: [] },
   { id: 'back_squat', name: 'Back squat', patterns: ['squat'], modality: 'weightlifting', skill: 3, fatigue: 4, grip: 2, impact: 1, equipment: ['barbell', 'rack'], isStrengthLift: true, substitutions: ['front_squat', 'goblet_squat', 'air_squat'] },
   { id: 'front_squat', name: 'Front squat', patterns: ['squat'], modality: 'weightlifting', skill: 4, fatigue: 4, grip: 3, impact: 1, equipment: ['barbell', 'rack'], isStrengthLift: true, substitutions: ['goblet_squat', 'air_squat'] },
-  { id: 'goblet_squat', name: 'Goblet squat', patterns: ['squat'], modality: 'weightlifting', skill: 2, fatigue: 2, grip: 2, impact: 1, equipment: ['kettlebell', 'dumbbell'], substitutions: ['air_squat'] },
+  { id: 'goblet_squat', name: 'Goblet squat', patterns: ['squat'], modality: 'weightlifting', skill: 2, fatigue: 2, grip: 2, impact: 1, equipment: ['kettlebell', 'dumbbell'], loadRx: { m: 24, f: 16 }, substitutions: ['air_squat'] },
   { id: 'thruster', name: 'Thruster', patterns: ['squat', 'press'], modality: 'weightlifting', skill: 3, fatigue: 5, grip: 3, impact: 1, equipment: ['barbell'], loadRx: { m: 43, f: 29 }, substitutions: ['dumbbell_thruster', 'goblet_squat'] },
   { id: 'overhead_squat', name: 'Overhead squat', patterns: ['squat', 'press'], modality: 'weightlifting', skill: 5, fatigue: 4, grip: 2, impact: 1, equipment: ['barbell'], isStrengthLift: true, substitutions: ['front_squat', 'goblet_squat'] },
   { id: 'pistol_squat', name: 'Pistol squat (monopodalico)', patterns: ['squat'], modality: 'gymnastics', skill: 5, fatigue: 3, grip: 1, impact: 1, equipment: [], substitutions: ['box_step_up', 'air_squat'] },
   { id: 'dumbbell_thruster', name: 'Dumbbell thruster', patterns: ['squat', 'press'], modality: 'weightlifting', skill: 2, fatigue: 4, grip: 3, impact: 1, equipment: ['dumbbell'], loadRx: { m: 22.5, f: 15 }, substitutions: ['goblet_squat'] },
   { id: 'wall_ball', name: 'Wall ball', patterns: ['squat', 'press'], modality: 'weightlifting', skill: 2, fatigue: 4, grip: 2, impact: 1, equipment: ['wall_ball'], loadRx: { m: 9, f: 6 }, substitutions: ['goblet_squat', 'air_squat'] },
-  { id: 'box_step_up', name: 'Box step-up', patterns: ['squat', 'lunge'], modality: 'bodyweight', skill: 1, fatigue: 2, grip: 1, impact: 1, equipment: ['box'], substitutions: [] },
-  { id: 'box_jump', name: 'Box jump', patterns: ['squat', 'jump'], modality: 'bodyweight', skill: 2, fatigue: 3, grip: 1, impact: 4, equipment: ['box'], substitutions: ['box_step_up'] },
+  { id: 'box_step_up', name: 'Box step-up', patterns: ['squat', 'lunge'], modality: 'bodyweight', skill: 1, fatigue: 2, grip: 1, impact: 1, equipment: ['box'], heightRx: { m: 20, f: 16 }, substitutions: [] },
+  { id: 'box_jump', name: 'Box jump', patterns: ['squat', 'jump'], modality: 'bodyweight', skill: 2, fatigue: 3, grip: 1, impact: 4, equipment: ['box'], heightRx: { m: 24, f: 20 }, substitutions: ['box_step_up'] },
   { id: 'lunge', name: 'Walking lunge', patterns: ['lunge'], modality: 'bodyweight', skill: 1, fatigue: 2, grip: 1, impact: 1, equipment: [], substitutions: [] },
 
   // ---- Hinge pattern ----

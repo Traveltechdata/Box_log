@@ -6,7 +6,7 @@ export function pickMovement(slot, context, usedIds) {
 
   const candidates = MOVEMENTS.filter(m =>
     m.patterns.includes(slot.pattern) &&
-    m.modality === slot.modality &&
+    (slot.modality == null || m.modality === slot.modality) &&
     !usedIds.has(m.id) &&
     (!m.recoveryOnly || context.isRecoverySession)
   );

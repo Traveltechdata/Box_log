@@ -3,7 +3,7 @@ import { getMovement, MOVEMENTS } from '../data/movements.js';
 import { pickMovement, readinessScaling, allocateTime } from './scaling.js';
 import { validate, score } from './validation.js';
 import { readinessBand } from './readiness.js';
-import { warmupDrillsForPatterns, pickGeneralRaise } from '../data/warmups.js';
+import { buildStructuredWarmup } from '../data/warmups.js';
 
 // Estimated seconds per rep, by pattern - rough, used only for FOR_TIME time-fit checks
 // (AMRAP/EMOM/TABATA/DEATH_BY/STRENGTH/SKILL are time-capped by definition, no estimate needed).
@@ -43,6 +43,14 @@ function fitDurationMinutes(template, context) {
 }
 
 function loadTextFor(movement, loadMult, gender) {
+  if (movement.heightRx) {
+    // Box height doesn't scale down with readiness the way a barbell load
+    // does — it's a fixed piece of equipment, so show the standard Rx as-is.
+    const { m, f } = movement.heightRx;
+    if (gender === 'm') return `${m}"`;
+    if (gender === 'f') return `${f}"`;
+    return `${m}"/${f}"`;
+  }
   if (!movement.loadRx) return null;
   const m = Math.round((movement.loadRx.m * loadMult) * 2) / 2; // nearest 0.5kg
   const f = Math.round((movement.loadRx.f * loadMult) * 2) / 2;
@@ -61,8 +69,11 @@ function pickMetconMovement(slot, context, usedIds) {
 function pickForSlot(slot, context, usedIds) {
   if (context.explicitMovements) {
     const next = context.explicitMovements.find(m => !usedIds.has(m.id));
-    if (!next) return null;
-    return { movement: next, chain: [next.id] };
+    if (next) return { movement: next, chain: [next.id] };
+    // User provided fewer movements than the format ideally uses — let the
+    // algorithm complete the WOD with a sensible complementary movement
+    // instead of failing the whole generation.
+    return pickMetconMovement(slot, context, usedIds);
   }
   return pickMetconMovement(slot, context, usedIds);
 }
@@ -112,14 +123,7 @@ function pickPreferredMovement(template, context) {
 
 // ---------------- warm-up ----------------
 function buildWarmup(minutes, patterns, equipment) {
-  const raise = pickGeneralRaise(equipment);
-  const raiseMinutes = Math.max(2, Math.min(5, Math.round(minutes * 0.35)));
-  const drills = warmupDrillsForPatterns(patterns);
-  return {
-    minutes,
-    raise: { name: raise.name, minutes: raiseMinutes },
-    drills,
-  };
+  return buildStructuredWarmup(minutes, patterns, equipment);
 }
 
 // ---------------- STRENGTH ----------------
@@ -257,13 +261,15 @@ function buildForTime(template, context) {
     totalSeconds = secPerMovementRep() * perMovementReps;
   }
 
+  const roundsForDisplay = ladderRungs ? null : Math.max(2, Math.round(perMovementReps / baseReps));
   const structureText = ladderRungs
     ? ladderRungs.join('-')
-    : `${Math.max(2, Math.round(perMovementReps / baseReps))} round \u2014 ${baseReps} reps a movimento`;
+    : `${roundsForDisplay} round \u2014 ${baseReps} reps a movimento`;
 
+  const perMovementRepsText = ladderRungs ? ladderRungs.join('-') : `${roundsForDisplay} x ${baseReps}`;
   const displayMovements = movements.map(({ movement }) => ({
     name: movement.name,
-    repsText: `${perMovementReps}`,
+    repsText: perMovementRepsText,
     loadText: loadTextFor(movement, scalingInfo.loadMult, context.gender),
   }));
 
@@ -640,6 +646,7 @@ export function generateWod(input) {
 function fallbackSession(context) {
   const warmup = buildWarmup(5, ['cyclical'], context.equipment);
   const minutes = Math.min(context.availableMinutes, 20);
+  const raise = pickGeneralRaiseFallback(context.equipment);
   return {
     templateLabel: 'Recovery / mobilit\u00e0',
     format: 'RECOVERY',
@@ -649,7 +656,7 @@ function fallbackSession(context) {
     main: {
       structureText: `Recovery \u2014 ${minutes}\u2019 continui`,
       scoreType: null,
-      movements: [{ name: 'Camminata veloce o bike leggera', repsText: `${minutes}'`, loadText: null }],
+      movements: [{ name: raise, repsText: `${minutes}'`, loadText: null }],
       estimatedMinutes: minutes,
       targetRpe: [2, 4],
       capRpe: 4,
@@ -659,6 +666,15 @@ function fallbackSession(context) {
     readiness: { score: undefined, band: context.readinessBand },
     patternsHit: ['cyclical'],
   };
+}
+
+// Recovery pieces should reach for a machine (row/bike/ski erg) before
+// falling back to walking, which is the last resort when nothing else is available.
+function pickGeneralRaiseFallback(equipment) {
+  if (equipment.includes('rower')) return 'Vogatore Zona 2';
+  if (equipment.includes('bike')) return 'Echo bike / Assault bike Zona 2';
+  if (equipment.includes('ski_erg')) return 'Ski erg Zona 2';
+  return 'Camminata veloce';
 }
 
 // ---------------- assisted generation: user picks format + 2-3 movements ----------------
@@ -697,6 +713,20 @@ export function generateWodFromMovements(input) {
     repScheme.repsPerMinute = isHeavy ? 4 : 10;
   }
 
+  const IDEAL_SLOT_COUNT = { FOR_TIME: 2, AMRAP_ROUNDS: 3, EMOM: 1, AMRAP_REPS: 1 };
+  const slotCount = format === 'AMRAP_REPS'
+    ? 1
+    : Math.min(3, Math.max(movements.length, IDEAL_SLOT_COUNT[format] || movements.length));
+
+  const FILLER_PATTERN_ROTATION = ['squat', 'pull', 'push', 'hinge', 'cyclical', 'core'];
+  const usedPatterns = new Set(movements.flatMap(m => m.patterns));
+  const fillerPatterns = FILLER_PATTERN_ROTATION.filter(p => !usedPatterns.has(p));
+  const movementSlots = Array.from({ length: slotCount }, (_, i) => {
+    if (i < movements.length) return { pattern: movements[i].patterns[0], modality: movements[i].modality };
+    const fp = fillerPatterns[(i - movements.length) % Math.max(1, fillerPatterns.length)] || FILLER_PATTERN_ROTATION[i % FILLER_PATTERN_ROTATION.length];
+    return { pattern: fp, modality: null }; // null modality = "any modality", resolved in pickMovement
+  });
+
   const durationMinutes = Math.max(WOD_MIN_MINUTES, Math.min(WOD_MAX_MINUTES, Math.round(availableMinutes)));
   const template = {
     id: 'custom_' + format.toLowerCase(),
@@ -705,7 +735,7 @@ export function generateWodFromMovements(input) {
     goals: ['conditioning'],
     time_domain: [WOD_MIN_MINUTES, WOD_MAX_MINUTES],
     duration: durationMinutes,
-    movement_slots: movements.map(() => ({ pattern: null, modality: null })),
+    movement_slots: movementSlots,
     repScheme,
     target_rpe: [7, 9],
   };

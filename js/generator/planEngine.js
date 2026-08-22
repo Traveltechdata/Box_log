@@ -168,6 +168,12 @@ export function advanceMetconWeek(plan) {
 
 // ---------------- rotation across active plans ----------------
 // Returns the plan most "overdue" relative to its target weekly frequency.
+const MIN_REST_DAYS_STRENGTH = 2;
+
+// Returns the plan most "overdue" relative to its target weekly frequency,
+// while respecting a mandatory minimum rest period for strength plans so the
+// same lift never gets proposed again the very next day. Returns null when
+// every active plan is still within its rest window (a genuine rest day).
 export function pickDuePlan(plans, sessions) {
   const active = plans.filter(p => p.status === 'active');
   if (active.length === 0) return null;
@@ -179,10 +185,25 @@ export function pickDuePlan(plans, sessions) {
     const lastDate = planSessions[0]?.date;
     const daysSince = lastDate ? (Date.now() - new Date(lastDate).getTime()) / DAY_MS : 999;
     const idealGapDays = 7 / (plan.targetFrequencyPerWeek || 2);
-    const urgency = daysSince / idealGapDays;
-    return { plan, urgency };
+    const minRest = plan.kind === 'strength' ? MIN_REST_DAYS_STRENGTH : 0;
+    const restBlocked = daysSince < minRest;
+    const urgency = restBlocked ? -999 : daysSince / idealGapDays;
+    return { plan, urgency, restBlocked, daysSince, minRest };
   });
 
   scored.sort((a, b) => b.urgency - a.urgency);
+  if (scored[0].restBlocked) return null; // every plan is still recovering
   return scored[0].plan;
+}
+
+// UI helper: how many days of rest remain for a plan right now (0 = ready today).
+export function restDaysRemaining(plan, sessions) {
+  if (plan.kind !== 'strength') return 0;
+  const planSessions = sessions
+    .filter(s => s.planId === plan.id && s.status !== 'planned')
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+  const lastDate = planSessions[0]?.date;
+  if (!lastDate) return 0;
+  const daysSince = (Date.now() - new Date(lastDate).getTime()) / DAY_MS;
+  return Math.max(0, Math.ceil(MIN_REST_DAYS_STRENGTH - daysSince));
 }

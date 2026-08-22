@@ -455,6 +455,50 @@ textarea { min-height: 60px; resize: vertical; }
   margin-bottom: 12px;
 }
 .phase-timer-value.overtime { color: var(--marker-red); }
+.phase-timer-value.prep { color: var(--marker-teal); }
+.phase-btn-row { display: flex; gap: 10px; }
+.phase-btn-row .btn { flex: 1; }
+
+.phase-stepper { display: flex; justify-content: center; gap: 8px; margin-bottom: 14px; }
+.phase-pill {
+  display: flex; align-items: center; gap: 5px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--chalk-dim);
+}
+.phase-pill.active { border-color: var(--marker-fuchsia); color: var(--marker-fuchsia); font-weight: 600; }
+.phase-pill.done { border-color: var(--marker-teal); color: var(--marker-teal); background: rgba(70,168,143,0.1); }
+.phase-pill .check { display: none; }
+.phase-pill.done .check { display: inline; }
+
+.session-notes {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line);
+  font-size: 13px;
+  color: var(--chalk-dim);
+  font-style: italic;
+  white-space: pre-wrap;
+}
+
+/* ---------- per-set strength logging ---------- */
+#set-log-rows { margin-top: 4px; }
+.set-log-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px dashed var(--line);
+}
+.set-log-row:last-child { border-bottom: none; }
+.set-log-row.done { color: var(--marker-teal); }
+.set-log-check { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.set-log-check input { width: 20px; height: 20px; accent-color: var(--marker-teal); }
+.set-log-row.done .set-log-check span { color: var(--marker-teal); font-weight: 600; }
+.set-log-weight-wrap { display: flex; align-items: center; gap: 6px; }
+.set-log-weight { width: 70px; margin-bottom: 0; text-align: right; font-family: var(--font-mono); }
+.set-log-weight-wrap .unit { font-size: 12px; color: var(--chalk-dim); }
 
 /* ---------- plan cards ---------- */
 .plan-item { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 12px; }
@@ -563,6 +607,37 @@ input[type="date"], input[type="time"] {
   margin-bottom: 10px;
   color-scheme: dark;
 }
+
+/* ---------- custom modal (replaces native confirm/prompt) ---------- */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 50;
+  padding: 24px;
+}
+.modal-box {
+  background: var(--board-alt);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: 20px;
+  width: 100%;
+  max-width: 340px;
+}
+.modal-message { font-size: 15px; line-height: 1.5; margin-bottom: 14px; color: var(--chalk); }
+#modal-input {
+  width: 100%;
+  background: var(--board);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--chalk);
+  font-family: var(--font-mono);
+  font-size: 16px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+}
+.modal-btn-row { display: flex; gap: 10px; }
+.modal-btn-row .btn { flex: 1; }
 
 /* ---------- toast ---------- */
 #toast {

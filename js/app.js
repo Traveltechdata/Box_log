@@ -2,14 +2,14 @@ import { generateWod, generateWodFromMovements } from './generator/generateWod.j
 import { allocateTime } from './generator/scaling.js';
 import { computeReadiness, readinessBand, trainingLoad } from './generator/readiness.js';
 import { MOVEMENTS, getMovement } from './data/movements.js';
-import { warmupDrillsForPatterns, pickGeneralRaise } from './data/warmups.js';
+import { buildStructuredWarmup } from './data/warmups.js';
 import { SKILLS, getSkill } from './data/skills.js';
 import {
   createStrengthPlan, createSkillPlan, createMetconPlan,
   strengthSessionPrescription, applyStrengthResult, isRetestDue, applyRetest,
   skillSessionPrescription, applySkillResult,
   metconWeekPlan, advanceMetconWeek,
-  pickDuePlan,
+  pickDuePlan, restDaysRemaining,
 } from './generator/planEngine.js';
 import {
   getProfile, saveProfile, getSessions, saveSession, recentPatterns, recentTemplateIds,
@@ -23,7 +23,7 @@ import { computeStreak, daysSinceLast, motivationalMessage, REMINDER_DAYS, notif
 import { monthLabel, buildMonthGrid, weekdayHeaderHtml, renderMonthGridHtml } from './ui/calendar.js';
 import { trainingLoadChartSvg } from './ui/chart.js';
 
-export const APP_VERSION = 'v7 - 21 ago 2026 (timer a fasi)';
+export const APP_VERSION = 'v8 - 21 ago 2026 (coach + timer)';
 
 const TIME_OPTIONS = [30, 45, 60, 75, 90];
 const LEVELS = [
@@ -92,8 +92,8 @@ const SKILL_PATTERNS = {
 };
 const METCON_WEEK_FORMATS = { 2: 'AMRAP_ROUNDS', 3: 'EMOM', 4: 'FOR_TIME', 5: 'AMRAP_ROUNDS' };
 const ASSISTED_FORMAT_TABS = [
-  { id: 'FOR_TIME', label: 'For Time', minMoves: 2, maxMoves: 3 },
-  { id: 'AMRAP_ROUNDS', label: 'AMRAP', minMoves: 2, maxMoves: 3 },
+  { id: 'FOR_TIME', label: 'For Time', minMoves: 1, maxMoves: 3 },
+  { id: 'AMRAP_ROUNDS', label: 'AMRAP', minMoves: 1, maxMoves: 3 },
   { id: 'EMOM', label: 'EMOM', minMoves: 1, maxMoves: 2 },
   { id: 'AMRAP_REPS', label: 'Total reps', minMoves: 1, maxMoves: 1 },
 ];
@@ -125,6 +125,44 @@ function toast(msg) {
   el.classList.add('show');
   clearTimeout(toast._t);
   toast._t = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+// Custom modal replacing window.confirm/prompt, which are unreliable in
+// iOS standalone (home-screen) PWAs.
+function showModal({ message, showInput = false, inputValue = '', confirmLabel = 'OK', cancelLabel = 'Annulla' }) {
+  return new Promise((resolve) => {
+    const overlay = $('#modal-overlay');
+    const msgEl = $('#modal-message');
+    const inputEl = $('#modal-input');
+    msgEl.textContent = message;
+    inputEl.style.display = showInput ? 'block' : 'none';
+    inputEl.value = inputValue;
+    $('#modal-btn-confirm').textContent = confirmLabel;
+    const cancelBtnEl = $('#modal-btn-cancel');
+    cancelBtnEl.textContent = cancelLabel;
+    cancelBtnEl.style.display = cancelLabel ? '' : 'none';
+    overlay.style.display = 'flex';
+    if (showInput) setTimeout(() => inputEl.focus(), 50);
+
+    const cleanup = (result) => {
+      overlay.style.display = 'none';
+      confirmBtn.removeEventListener('click', onConfirm);
+      cancelBtn.removeEventListener('click', onCancel);
+      resolve(result);
+    };
+    const confirmBtn = $('#modal-btn-confirm');
+    const cancelBtn = $('#modal-btn-cancel');
+    const onConfirm = () => cleanup(showInput ? (inputEl.value || null) : true);
+    const onCancel = () => cleanup(showInput ? null : false);
+    confirmBtn.addEventListener('click', onConfirm);
+    cancelBtn.addEventListener('click', onCancel);
+  });
+}
+function showConfirm(message) {
+  return showModal({ message, showInput: false });
+}
+function showPrompt(message, defaultValue = '') {
+  return showModal({ message, showInput: true, inputValue: defaultValue });
 }
 
 function renderChipGroup(container, options, selectedId, onSelect) {
@@ -258,6 +296,8 @@ function getSessionPhases(session) {
   return [{ key: 'session', label: 'Sessione', minutes: session.availableMinutes, countUp: true }];
 }
 
+const PREP_SECONDS = 10;
+
 function renderPhaseUI() {
   const session = state.session;
   if (!session.timerStarted) {
@@ -267,83 +307,205 @@ function renderPhaseUI() {
   } else {
     $('#phase-start-wrap').style.display = 'none';
     $('#phase-timer-wrap').style.display = 'block';
-    updatePhaseTimerDisplay();
-    startPhaseInterval();
+    runTimerLoop();
   }
+}
+
+// ---------------- audio (unlocked on first tap, reused for every beep) ----------------
+let audioCtx = null;
+function ensureAudioCtx() {
+  if (!audioCtx) {
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { /* unsupported */ }
+  } else if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+  return audioCtx;
+}
+function playBeep() {
+  const ctx = ensureAudioCtx();
+  if (!ctx) return;
+  const t = ctx.currentTime;
+  [0, 0.45].forEach((offset) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.0001, t + offset);
+    gain.gain.exponentialRampToValueAtTime(0.3, t + offset + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + offset + 0.35);
+    osc.start(t + offset);
+    osc.stop(t + offset + 0.4);
+  });
+}
+function speak(text) {
+  try {
+    if ('speechSynthesis' in window) {
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'it-IT';
+      window.speechSynthesis.speak(u);
+    }
+  } catch (e) { /* unsupported */ }
 }
 
 $('#btn-start-workout').addEventListener('click', () => {
+  ensureAudioCtx();
   const session = state.session;
   session.timerStarted = true;
   session.phaseIndex = 0;
-  session.phaseStartedAt = new Date().toISOString();
+  session.phasesCompleted = [];
+  session.pausedFromState = null;
+  session.pausedAt = null;
   session.overallStartedAt = new Date().toISOString();
-  persistSession();
-  renderPhaseUI();
+  $('#phase-start-wrap').style.display = 'none';
+  $('#phase-timer-wrap').style.display = 'block';
+  beginPrep();
 });
 
-$('#btn-next-phase').addEventListener('click', () => advancePhase(false));
+$('#btn-next-phase').addEventListener('click', () => goToNextPhase());
+$('#btn-pause-phase').addEventListener('click', () => togglePause());
 
-function advancePhase(auto) {
+function beginPrep() {
   const session = state.session;
+  session.phaseState = 'prep';
+  session.phaseStateStartedAt = new Date().toISOString();
+  persistSession();
+  runTimerLoop();
+}
+function beginPhaseRunning() {
+  const session = state.session;
+  session.phaseState = 'running';
+  session.phaseStateStartedAt = new Date().toISOString();
+  persistSession();
+  runTimerLoop();
+}
+function markPhaseReady() {
+  const session = state.session;
+  session.phaseState = 'ready';
+  persistSession();
   const phases = getSessionPhases(session);
-  if (session.phaseIndex < phases.length - 1) {
-    session.phaseIndex += 1;
-    session.phaseStartedAt = new Date().toISOString();
-    persistSession();
-    if (auto) toast(`Fase successiva: ${phases[session.phaseIndex].label}`);
-    updatePhaseTimerDisplay();
-  }
+  const phase = phases[session.phaseIndex];
+  playBeep();
+  speak(`${phase.label} completata. Passa alla fase successiva.`);
 }
 
-function updatePhaseTimerDisplay() {
+function goToNextPhase() {
+  const session = state.session;
+  const phases = getSessionPhases(session);
+  session.phasesCompleted = session.phasesCompleted || [];
+  if (!session.phasesCompleted.includes(session.phaseIndex)) session.phasesCompleted.push(session.phaseIndex);
+  if (session.phaseIndex >= phases.length - 1) {
+    persistSession();
+    toast('Ultima fase: premi Termina sessione quando hai finito');
+    return;
+  }
+  session.phaseIndex += 1;
+  session.pausedFromState = null;
+  session.pausedAt = null;
+  beginPrep();
+}
+
+function togglePause() {
+  const session = state.session;
+  const now = Date.now();
+  if (session.phaseState === 'paused') {
+    const pausedMs = now - new Date(session.pausedAt).getTime();
+    session.phaseStateStartedAt = new Date(new Date(session.phaseStateStartedAt).getTime() + pausedMs).toISOString();
+    session.overallStartedAt = new Date(new Date(session.overallStartedAt).getTime() + pausedMs).toISOString();
+    session.phaseState = session.pausedFromState;
+    session.pausedFromState = null;
+    session.pausedAt = null;
+  } else {
+    session.pausedFromState = session.phaseState;
+    session.phaseState = 'paused';
+    session.pausedAt = new Date(now).toISOString();
+  }
+  persistSession();
+  runTimerLoop();
+}
+
+function updatePhaseStepper(session, phases) {
+  const el = $('#phase-stepper');
+  const completed = session.phasesCompleted || [];
+  el.innerHTML = phases.map((p, i) => {
+    const isActive = i === session.phaseIndex;
+    const isDone = completed.includes(i) && !isActive;
+    return `<span class="phase-pill${isActive ? ' active' : ''}${isDone ? ' done' : ''}"><span class="check">\u2713</span>${p.label}</span>`;
+  }).join('');
+}
+
+function updateOverallTimerDisplay(session) {
+  const overallSec = Math.max(0, Math.floor((Date.now() - new Date(session.overallStartedAt || session.startedAt).getTime()) / 1000));
+  const oMm = Math.floor(overallSec / 60), oSs = overallSec % 60;
+  const overallEl = $('#session-timer');
+  if (overallEl) overallEl.textContent = `${oMm}:${String(oSs).padStart(2, '0')}`;
+}
+
+function updateTimerDisplay() {
   const session = state.session;
   if (!session || !session.timerStarted) return;
   const phases = getSessionPhases(session);
   const phase = phases[session.phaseIndex];
   if (!phase) return;
 
-  const elapsedSec = Math.floor((Date.now() - new Date(session.phaseStartedAt).getTime()) / 1000);
+  updatePhaseStepper(session, phases);
+  $('#btn-next-phase').style.display = session.phaseIndex >= phases.length - 1 && session.phaseState !== 'ready' ? 'none' : '';
+  $('#btn-pause-phase').textContent = session.phaseState === 'paused' ? 'Riprendi' : 'Pausa';
+
+  if (session.phaseState === 'paused') {
+    $('#phase-name').textContent = `${phase.label} \u2014 in pausa`;
+    updateOverallTimerDisplay({ ...session, overallStartedAt: session.overallStartedAt });
+    return;
+  }
+
+  if (session.phaseState === 'prep') {
+    const elapsed = Math.floor((Date.now() - new Date(session.phaseStateStartedAt).getTime()) / 1000);
+    const remaining = PREP_SECONDS - elapsed;
+    if (remaining <= 0) { beginPhaseRunning(); return; }
+    $('#phase-name').textContent = `Preparati: ${phase.label}`;
+    const valEl = $('#phase-timer-value');
+    valEl.textContent = String(remaining);
+    valEl.classList.add('prep');
+    valEl.classList.remove('overtime');
+    $('#phase-progress').textContent = `Fase ${session.phaseIndex + 1}/${phases.length}`;
+    updateOverallTimerDisplay(session);
+    return;
+  }
+
+  const elapsedSec = Math.floor((Date.now() - new Date(session.phaseStateStartedAt).getTime()) / 1000);
   let displaySec, overtime = false;
   if (phase.countUp || !phase.minutes) {
     displaySec = elapsedSec;
   } else {
     const totalSec = phase.minutes * 60;
     displaySec = totalSec - elapsedSec;
-    if (displaySec <= 0) { overtime = true; displaySec = Math.abs(displaySec); }
-    if (overtime && session.phaseIndex < phases.length - 1) {
-      advancePhase(true);
-      return;
+    if (displaySec <= 0) {
+      if (session.phaseState !== 'ready') markPhaseReady();
+      displaySec = 0;
     }
   }
   const mm = Math.floor(displaySec / 60), ss = displaySec % 60;
   const valEl = $('#phase-timer-value');
-  if (valEl) {
-    valEl.textContent = `${overtime ? '+' : ''}${mm}:${String(ss).padStart(2, '0')}`;
-    valEl.classList.toggle('overtime', overtime);
-  }
-  const nameEl = $('#phase-name');
-  if (nameEl) nameEl.textContent = phase.label;
-  const progEl = $('#phase-progress');
-  if (progEl) progEl.textContent = `Fase ${session.phaseIndex + 1}/${phases.length}`;
+  valEl.textContent = `${overtime ? '+' : ''}${mm}:${String(ss).padStart(2, '0')}`;
+  valEl.classList.remove('prep');
+  valEl.classList.toggle('overtime', session.phaseState === 'ready');
+  $('#phase-name').textContent = session.phaseState === 'ready' ? `${phase.label} completata \u2014 tocca "Fase successiva"` : phase.label;
+  $('#phase-progress').textContent = `Fase ${session.phaseIndex + 1}/${phases.length}`;
 
-  const overallSec = Math.floor((Date.now() - new Date(session.overallStartedAt || session.startedAt).getTime()) / 1000);
-  const oMm = Math.floor(overallSec / 60), oSs = overallSec % 60;
-  const overallEl = $('#session-timer');
-  if (overallEl) overallEl.textContent = `${oMm}:${String(oSs).padStart(2, '0')}`;
+  updateOverallTimerDisplay(session);
 }
 
-function startPhaseInterval() {
+function runTimerLoop() {
   clearInterval(state.timerHandle);
-  state.timerHandle = setInterval(updatePhaseTimerDisplay, 1000);
-  updatePhaseTimerDisplay();
+  updateTimerDisplay();
+  state.timerHandle = setInterval(updateTimerDisplay, 1000);
 }
 function stopSessionTimer() {
   clearInterval(state.timerHandle);
 }
 
-$('#btn-cancel-session').addEventListener('click', () => {
-  if (!confirm('Annullare questa sessione? Non verrà salvata nello storico.')) return;
+$('#btn-cancel-session').addEventListener('click', async () => {
+  const ok = await showConfirm('Annullare questa sessione? Non verrà salvata nello storico.');
+  if (!ok) return;
   stopSessionTimer();
   clearActiveSession();
   state.session = null;
@@ -360,9 +522,20 @@ function renderDuePlanCard() {
     $('#btn-start-guided').style.opacity = '0.5';
     return;
   }
+  const due = pickDuePlan(plans, getSessions());
+  if (!due) {
+    const strengthPlans = plans.filter(p => p.kind === 'strength');
+    const restInfo = strengthPlans.map(p => `${p.label.replace('Forza \u2014 ', '')} (${restDaysRemaining(p, getSessions())}g)`).join(', ');
+    wrap.innerHTML = `
+      <div class="due-plan-title">Giorno di riposo consigliato</div>
+      <div class="due-plan-detail">Hai lavorato questi movimenti troppo di recente per riproporli oggi: ${restInfo}. Torna tra qualche giorno, oppure allenati in modalit\u00e0 Manuale/Monostrutturale se vuoi comunque muoverti.</div>
+    `;
+    $('#btn-start-guided').disabled = true;
+    $('#btn-start-guided').style.opacity = '0.5';
+    return;
+  }
   $('#btn-start-guided').disabled = false;
   $('#btn-start-guided').style.opacity = '1';
-  const due = pickDuePlan(plans, getSessions());
   const others = plans.filter(p => p.id !== due.id);
   let html = planSummaryHtml(due);
   if (others.length > 0) {
@@ -452,6 +625,7 @@ $('#btn-start-guided').addEventListener('click', () => {
   const plans = getPlans().filter(p => p.status === 'active');
   if (plans.length === 0) { toast('Crea prima un piano'); return; }
   const due = pickDuePlan(plans, getSessions());
+  if (!due) { toast('Oggi \u00e8 raccomandato il riposo \u2014 usa Manuale o Monostrutturale se vuoi allenarti comunque'); return; }
   state.pendingSession = { kind: 'guided', planId: due.id };
   showCheckinState();
 });
@@ -485,7 +659,11 @@ $('#btn-checkin-confirm').addEventListener('click', () => {
     draft: {},
     timerStarted: false,
     phaseIndex: 0,
-    phaseStartedAt: null,
+    phaseState: 'idle',
+    phaseStateStartedAt: null,
+    phasesCompleted: [],
+    pausedFromState: null,
+    pausedAt: null,
     overallStartedAt: null,
   };
 
@@ -536,14 +714,10 @@ function buildSessionContentData(session) {
     const movement = getMovement(plan.movementId);
     const rx = strengthSessionPrescription(plan);
     const split = splitSessionMinutes(session.availableMinutes, true);
-    const warmup = buildWarmupFor(movement.patterns, profile.equipment);
+    const warmup = buildWarmupFor(split.warmup, movement.patterns, profile.equipment);
     const wod = buildFocusAvoidingWod(split.wod, movement.patterns, session, profile);
     session.content = { type: 'strength', planId: plan.id, movement: movement.name, rx, warmup, wod, centralMinutes: split.central };
-    session.draft.strengthCompleted = true;
-    session.draft.weightMode = 'auto';
-    session.draft.customSets = rx.sets;
-    session.draft.customReps = rx.reps;
-    session.draft.customWeight = rx.weightKg ?? null;
+    session.draft.setLogs = Array.from({ length: rx.sets }, () => ({ done: false, weight: rx.weightKg ?? null }));
     return;
   }
 
@@ -551,7 +725,7 @@ function buildSessionContentData(session) {
     const { skill, step, isFinalStep } = skillSessionPrescription(plan);
     const patterns = SKILL_PATTERNS[plan.skillId] || [];
     const split = splitSessionMinutes(session.availableMinutes, true);
-    const warmup = buildWarmupFor(patterns, profile.equipment);
+    const warmup = buildWarmupFor(split.warmup, patterns, profile.equipment);
     const wod = buildFocusAvoidingWod(split.wod, patterns, session, profile);
     session.content = { type: 'skill', planId: plan.id, skillLabel: skill.label, step, stepIndex: plan.stepIndex, totalSteps: skill.steps.length, isFinalStep, warmup, wod, centralMinutes: split.central };
     session.draft.skillClean = true;
@@ -561,7 +735,7 @@ function buildSessionContentData(session) {
   if (plan.kind === 'metcon') {
     const wp = metconWeekPlan(plan);
     if (wp.isRetest) {
-      const warmup = buildWarmupFor([], profile.equipment);
+      const warmup = buildWarmupFor(allocateTime(session.availableMinutes).warmup, [], profile.equipment);
       session.content = { type: 'metcon_retest', planId: plan.id, week: wp.week, benchmarkLabel: plan.benchmarkLabel, benchmarkDescription: plan.benchmarkDescription, warmup };
       return;
     }
@@ -585,10 +759,8 @@ function buildSessionContentData(session) {
   }
 }
 
-function buildWarmupFor(patterns, equipment) {
-  const raise = pickGeneralRaise(equipment);
-  const drills = warmupDrillsForPatterns(patterns);
-  return { raise, drills };
+function buildWarmupFor(minutes, patterns, equipment) {
+  return buildStructuredWarmup(minutes, patterns, equipment);
 }
 
 // Splits the session into warmup / central (strength or skill) / wod / cooldown.
@@ -644,14 +816,10 @@ function renderActiveSessionContent() {
       <div class="primary-block strength">
         <div class="primary-kind">Forza</div>
         <div class="primary-movement">${content.movement}</div>
-        <div class="chip-group" id="strength-mode-chips" style="margin:6px 0 10px;"></div>
         <div id="strength-prescription-area"></div>
       </div>
-      <span class="field-label">Hai completato tutte le serie previste?</span>
-      <div class="chip-group" id="strength-result-chips"></div>
     ` + renderWodMainOnly(content.wod);
-    bindBoolChips('#strength-result-chips', 'strengthCompleted', true);
-    bindStrengthModeChips();
+    renderSetLogRows();
   } else if (content.type === 'skill') {
     el.innerHTML = warmupHtml(content.warmup) + `
       <div class="primary-block skill">
@@ -713,12 +881,18 @@ function sessionTitle(session) {
 }
 
 function warmupHtml(warmup) {
-  const items = [`<li><span>${warmup.raise.name}</span><span class="reps">avvio</span></li>`]
-    .concat(warmup.drills.map(d => `<li><span>${d.name}</span><span class="reps">${d.prescription}</span></li>`));
-  return renderWodBlock('warmup', 'Warm-up', null, `<ul class="wod-move-list">${items.join('')}</ul>`);
+  const raiseItem = `<li><span>${warmup.raise.name}</span><span class="reps">${warmup.raise.prescription}</span></li>`;
+  const circuitItems = warmup.circuit.map(d => `<li><span>${d.name}</span><span class="reps">${d.reps}</span></li>`).join('');
+  const roundsLabel = warmup.rounds > 1 ? `${warmup.rounds} giri` : '1 giro';
+  return renderWodBlock('warmup', 'Warm-up', warmup.minutes, `
+    <ul class="wod-move-list">${raiseItem}</ul>
+    <div class="wod-score-type">${roundsLabel} del circuito:</div>
+    <ul class="wod-move-list">${circuitItems}</ul>
+  `);
 }
-function renderWodBlock(key, label, minutes, content) {
-  return `<div class="wod-block"><div class="wod-block-label"><span class="swatch" style="background:${WOD_BLOCK_COLORS[key]}"></span><span class="txt">${label}</span>${minutes != null ? `<span class="mins">${minutes} min</span>` : ''}</div>${content}</div>`;
+function renderWodBlock(key, label, minutes, content, minutesLabel) {
+  const badge = minutes != null ? `<span class="mins">${minutesLabel || `${minutes} min`}</span>` : '';
+  return `<div class="wod-block"><div class="wod-block-label"><span class="swatch" style="background:${WOD_BLOCK_COLORS[key]}"></span><span class="txt">${label}</span>${badge}</div>${content}</div>`;
 }
 function renderWodBlocksHtml(wod) {
   return warmupHtml(wod.warmup) + renderWodMainOnly(wod);
@@ -726,65 +900,46 @@ function renderWodBlocksHtml(wod) {
 function renderWodMainOnly(wod) {
   const moveItems = wod.main.movements.map(m =>
     `<li><span>${m.name}${m.loadText ? ` <span class="muted small">(${m.loadText})</span>` : ''}</span><span class="reps">${m.repsText}</span></li>`).join('');
+  const minutesLabel = wod.format === 'FOR_TIME' ? `time cap ${wod.main.estimatedMinutes} min` : null;
   let html = renderWodBlock('main', FORMAT_LABELS[wod.format] || 'WOD', wod.main.estimatedMinutes, `
     <div class="wod-structure">${wod.main.structureText}</div>
     ${wod.main.scoreType ? `<div class="wod-score-type">Punteggio: ${wod.main.scoreType}</div>` : ''}
     <ul class="wod-move-list">${moveItems}</ul>
     <div class="wod-meta"><span>Target RPE ${wod.main.targetRpe[0]}-${wod.main.targetRpe[1]}</span><span>Cap RPE ${wod.main.capRpe}</span></div>
-  `);
+  `, minutesLabel);
   html += renderWodBlock('cooldown', 'Cooldown', wod.cooldown.minutes, `<p>${wod.cooldown.text}</p>`);
   return html;
 }
 
-function bindStrengthModeChips() {
-  const session = state.session;
-  const content = session.content;
-  const modeOptions = [{ id: 'auto', label: 'Calcolato' }, { id: 'custom', label: 'Personalizza' }];
-  const bind = () => renderChipGroup($('#strength-mode-chips'), modeOptions, session.draft.weightMode, (id) => {
-    session.draft.weightMode = id;
-    persistSession();
-    bind();
-    renderStrengthPrescriptionArea();
-  });
-  bind();
-  renderStrengthPrescriptionArea();
-}
-
-function renderStrengthPrescriptionArea() {
+function renderSetLogRows() {
   const session = state.session;
   const content = session.content;
   const areaEl = $('#strength-prescription-area');
-  if (session.draft.weightMode === 'auto') {
-    areaEl.innerHTML = `
-      <div class="primary-prescription">${content.rx.sets} x ${content.rx.reps} @ ${content.rx.weightKg}kg</div>
-      <span class="field-label">Carico (kg) \u2014 modificalo se ti sembra sbagliato</span>
-      <input type="number" id="strength-weight-input" step="0.5" value="${session.draft.customWeight ?? ''}" placeholder="es. 85" />
-    `;
-    $('#strength-weight-input').addEventListener('input', (e) => {
-      session.draft.customWeight = Number(e.target.value) || null;
+  const logs = session.draft.setLogs;
+  areaEl.innerHTML = `
+    <div class="primary-prescription">${content.rx.sets} x ${content.rx.reps} @ ${content.rx.weightKg ?? '\u2014'}kg (riferimento)</div>
+    <span class="field-label">Spunta ogni serie fatta, modifica il carico se serve</span>
+    <div id="set-log-rows">
+      ${logs.map((log, i) => `
+        <div class="set-log-row${log.done ? ' done' : ''}" data-i="${i}">
+          <label class="set-log-check"><input type="checkbox" ${log.done ? 'checked' : ''} /><span>Serie ${i + 1}</span></label>
+          <div class="set-log-weight-wrap"><input type="number" class="set-log-weight" step="0.5" value="${log.weight ?? ''}" placeholder="kg" /><span class="unit">kg</span></div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+  areaEl.querySelectorAll('.set-log-row').forEach((rowEl) => {
+    const i = Number(rowEl.dataset.i);
+    rowEl.querySelector('input[type=checkbox]').addEventListener('change', (e) => {
+      logs[i].done = e.target.checked;
+      persistSession();
+      rowEl.classList.toggle('done', e.target.checked);
+    });
+    rowEl.querySelector('.set-log-weight').addEventListener('input', (e) => {
+      logs[i].weight = e.target.value === '' ? null : Number(e.target.value);
       persistSession();
     });
-  } else {
-    areaEl.innerHTML = `
-      <div style="display:flex; gap:8px;">
-        <div style="flex:1;">
-          <span class="field-label">Serie</span>
-          <input type="number" id="strength-sets-input" value="${session.draft.customSets}" />
-        </div>
-        <div style="flex:1;">
-          <span class="field-label">Ripetizioni</span>
-          <input type="number" id="strength-reps-input" value="${session.draft.customReps}" />
-        </div>
-        <div style="flex:1;">
-          <span class="field-label">Carico (kg)</span>
-          <input type="number" id="strength-weight-input" step="0.5" value="${session.draft.customWeight ?? ''}" placeholder="es. 85" />
-        </div>
-      </div>
-    `;
-    $('#strength-sets-input').addEventListener('input', (e) => { session.draft.customSets = Number(e.target.value) || content.rx.sets; persistSession(); });
-    $('#strength-reps-input').addEventListener('input', (e) => { session.draft.customReps = Number(e.target.value) || content.rx.reps; persistSession(); });
-    $('#strength-weight-input').addEventListener('input', (e) => { session.draft.customWeight = Number(e.target.value) || null; persistSession(); });
-  }
+  });
 }
 
 function bindBoolChips(selector, draftKey, defaultVal) {
@@ -823,7 +978,12 @@ function renderManualBuilder() {
   const focusPatterns = manualFocusPatterns(content);
   const wodPatterns = manualWodPatterns(content);
   const warmupPatterns = focusPatterns.length ? focusPatterns : wodPatterns;
-  const warmup = buildWarmupFor(warmupPatterns, profile.equipment);
+  const warmupKey = warmupPatterns.slice().sort().join(',');
+  if (!content._warmupCache || content._warmupCacheKey !== warmupKey) {
+    content._warmupCache = buildWarmupFor(allocateTime(session.availableMinutes).warmup, warmupPatterns, profile.equipment);
+    content._warmupCacheKey = warmupKey;
+  }
+  const warmup = content._warmupCache;
 
   let html = warmupHtml(warmup);
   html += '<span class="field-label">Focus di oggi</span><div class="chip-group" id="manual-focus-chips"></div>';
@@ -922,7 +1082,7 @@ function renderManualWodArea() {
 
     areaEl.innerHTML = `
       <div class="tab-strip" id="assist-format-tabs"></div>
-      <p class="small muted" style="margin:8px 0;">Scegli ${formatDef.minMoves}${formatDef.maxMoves > formatDef.minMoves ? `-${formatDef.maxMoves}` : ''} movimenti \u2014 il motore calcola reps, round e carichi.</p>
+      <p class="small muted" style="margin:8px 0;">Scegli almeno ${formatDef.minMoves} movimento${formatDef.minMoves > 1 ? 'i' : ''} (fino a ${formatDef.maxMoves}) \u2014 se ne scegli meno, il motore completa lui il WOD.</p>
       ${slotsHtml}
       <button type="button" class="btn btn-primary" id="btn-assist-generate" style="margin-top:10px;">Genera WOD</button>
     `;
@@ -1055,16 +1215,18 @@ $('#btn-endsession-save').addEventListener('click', () => {
 
   if (content && content.type === 'strength' && completion > 0) {
     const plan = getPlan(content.planId);
+    const setLogs = session.draft.setLogs || [];
+    const setsDone = setLogs.filter(s => s.done).length;
+    const allSetsDone = setLogs.length > 0 && setsDone === setLogs.length;
     if (plan) {
-      const updated = applyStrengthResult(plan, { completedAllSets: !!session.draft.strengthCompleted });
+      const updated = applyStrengthResult(plan, { completedAllSets: allSetsDone });
       updatePlan(plan.id, updated);
       patternsHit = ((getMovement(plan.movementId) || {}).patterns || []).concat(content.wod.patternsHit || []);
     }
     extraFields.planId = content.planId;
-    extraFields.actualSets = session.draft.customSets;
-    extraFields.actualReps = session.draft.customReps;
-    extraFields.actualWeightKg = session.draft.customWeight;
-    extraFields.weightMode = session.draft.weightMode;
+    extraFields.setLogs = setLogs;
+    extraFields.setsCompleted = setsDone;
+    extraFields.setsPrescribed = setLogs.length;
   } else if (content && content.type === 'skill' && completion > 0) {
     const plan = getPlan(content.planId);
     if (plan) {
@@ -1147,16 +1309,17 @@ function renderPlans() {
   } else {
     list.innerHTML = plans.map(planCardHtml).join('');
     list.querySelectorAll('.btn-delete-plan').forEach(btn => {
-      btn.addEventListener('click', () => {
-        if (!confirm('Eliminare questo piano? Lo storico delle sessioni resta comunque salvato.')) return;
+      btn.addEventListener('click', async () => {
+        const ok = await showConfirm('Eliminare questo piano? Lo storico delle sessioni resta comunque salvato.');
+        if (!ok) return;
         deletePlan(btn.dataset.id);
         renderPlans();
       });
     });
     list.querySelectorAll('.btn-retest-plan').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const plan = getPlan(btn.dataset.id);
-        const val = prompt(`Nuovo 1RM per ${plan.movementLabel} (kg)`, Math.round(plan.trainingMax / 0.85));
+        const val = await showPrompt(`Nuovo 1RM per ${plan.movementLabel} (kg)`, Math.round(plan.trainingMax / 0.85));
         if (val === null) return;
         const num = Number(val);
         if (Number.isNaN(num)) { toast('Valore non valido'); return; }
@@ -1337,6 +1500,7 @@ function sessionItemHtml(s) {
       <div class="row1"><span class="date">${dateStr}</span>${completionBadge(s)}</div>
       <div class="title">${s.title || '-'}</div>
       <div class="stats">${metaLineHtml(s)}</div>
+      ${s.notes ? `<div class="session-notes">${s.notes}</div>` : ''}
     </div>`;
 }
 
@@ -1381,19 +1545,36 @@ function renderDayDetail(isoDate) {
     <div class="card" style="margin-bottom:10px;">
       <div class="row1" style="display:flex; justify-content:space-between; margin-bottom:6px;"><strong>${s.title}</strong>${completionBadge(s)}</div>
       <div class="wod-meta">${metaLineHtml(s)}</div>
+      ${s.notes ? `<div class="session-notes">${s.notes}</div>` : ''}
     </div>
   `).join('');
 }
 
-$('#btn-export').addEventListener('click', () => {
+$('#btn-export').addEventListener('click', async () => {
   const data = exportData();
+  const filename = `box-log-backup-${new Date().toISOString().slice(0, 10)}.json`;
   const blob = new Blob([data], { type: 'application/json' });
+
+  // The native share sheet is far more reliable than a hidden download link
+  // on iOS, especially when the app is installed on the Home Screen.
+  const file = new File([blob], filename, { type: 'application/json' });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: 'Box Log backup' });
+      return;
+    } catch (err) {
+      if (err && err.name === 'AbortError') return; // user cancelled the share sheet
+      // fall through to the download-link fallback below
+    }
+  }
+
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `box-log-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+  toast('Se il download non parte, prova da Safari (non dall\'icona sulla Home)');
 });
 $('#btn-import').addEventListener('click', () => $('#import-file').click());
 $('#import-file').addEventListener('change', async (e) => {
@@ -1502,8 +1683,9 @@ $('#btn-save-profile').addEventListener('click', () => {
   renderProfileSummary(profile);
   toast('Profilo salvato');
 });
-$('#btn-reset').addEventListener('click', () => {
-  if (!confirm("Cancellare tutti i dati da questo dispositivo? Non e' reversibile.")) return;
+$('#btn-reset').addEventListener('click', async () => {
+  const ok = await showConfirm("Cancellare tutti i dati da questo dispositivo? Non e' reversibile.");
+  if (!ok) return;
   clearAll();
   state.profile = defaultProfile();
   hydrateProfileForm();
@@ -1513,7 +1695,7 @@ $('#btn-reset').addEventListener('click', () => {
   toast('Dati azzerati');
 });
 $('#btn-help').addEventListener('click', () => {
-  alert('Box Log ti segue verso un obiettivo: crea un piano (Forza/Skill/Metcon) in "Piani", poi da "Oggi" premi "Sessione guidata" - l\'app propone lo step dovuto e ricorda dove sei arrivato.');
+  showModal({ message: 'Box Log ti segue verso un obiettivo: crea un piano (Forza/Skill/Metcon) in "Piani", poi da "Oggi" premi "Sessione guidata" - l\'app propone lo step dovuto e ricorda dove sei arrivato.', confirmLabel: 'Ho capito', cancelLabel: '' });
 });
 
 function hydrateReminderForm() {

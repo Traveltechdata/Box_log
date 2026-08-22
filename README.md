@@ -73,3 +73,17 @@ Questa versione copre la **Fase 1**: CrossFit ristrutturato con architettura Pia
 4. Triathlon Sprint (750m/20km/5km) - piano di endurance multi-disciplina, senza scadenza gara fissa.
 
 Sincronizzazione multi-dispositivo (Supabase) resta un'estensione futura, utile anche per notifiche push reali su iPhone.
+
+## Novità v8: timer reale + logica da coach
+
+- **Timer a fasi con avvio esplicito**: nulla parte finché non premi il pulsante rotondo INIZIA. Ogni fase (warm-up, centrale, WOD) ha un conto alla rovescia dedicato; a zero suona un segnale (beep + voce) e il timer si ferma, aspettando che tu tocchi "Fase successiva" — che poi avvia 10" di preparazione prima della fase successiva. Tasto **Pausa** disponibile in ogni momento. Le fasi completate si illuminano in verde con spunta.
+- **Dialoghi nativi sostituiti**: `confirm()`/`prompt()` di iOS sono noti per essere inaffidabili nelle app installate sulla Home — sostituiti con finestre di conferma proprie dell'app.
+- **Warm-up vero**: struttura a 2-3 giri di circuito, sempre misurabile (tempo/reps espliciti), con vera variet\u00e0 tra una sessione e l'altra (non pi\u00f9 sempre gli stessi esercizi nello stesso ordine).
+- **Scaletta corretta**: un WOD tipo 25-18-11 ora mostra la scaletta reale per movimento, non la somma totale.
+- **Pesi e misure Rx**: kettlebell 24kg uomini / 16kg donne, altezza box jump 24"/20" (con 30" come standard avanzato).
+- **Sessione Forza per-serie**: spunta ogni singola serie fatta, modifica il carico set per set (utile se sei stanco sull'ultima serie).
+- **Generazione assistita pi\u00f9 flessibile**: basta scegliere anche solo 1 movimento, l'app completa lei il WOD con movimenti complementari.
+- **Note visibili**: ora comparivano sia nella lista Storico che nel dettaglio calendario.
+- **Export pi\u00f9 affidabile**: usa il pannello di condivisione nativo di iOS quando disponibile, invece del download silenzioso che spesso non partiva.
+- **Logica da coach**: un piano di Forza non torna "dovuto" prima di 2 giorni dall'ultima sessione sullo stesso movimento \u2014 se tutti i piani sono ancora in recupero, l'app te lo dice chiaramente invece di riproporre lo stesso lavoro troppo presto.
+- **Recupero attivo**: vogatore/bike/ski erg preferiti alla camminata quando l'attrezzatura \u00e8 disponibile.
